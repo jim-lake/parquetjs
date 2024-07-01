@@ -1,11 +1,11 @@
-import chai, {expect} from "chai"
-import { Int64 } from "thrift";
+import chai, { expect } from 'chai';
+import { Int64 } from 'thrift';
 import { parseBloomFilterOffsets } from '../lib/bloomFilterIO/bloomFilterReader';
-import {ColumnChunkData, ColumnChunkExt, ColumnMetaDataExt} from "../lib/declare";
-import XxHasher from "../lib/bloom/xxhasher";
+import { ColumnChunkData, ColumnChunkExt, ColumnMetaDataExt } from '../lib/declare';
+import XxHasher from '../lib/bloom/xxhasher';
 const assert = chai.assert;
 
-const emptyOffset = () => new Int64(Buffer.from(""), 0);
+const emptyOffset = () => new Int64(Buffer.from(''), 0);
 
 const emptyMetaData = (): ColumnMetaDataExt => {
   return {
@@ -22,25 +22,24 @@ const emptyMetaData = (): ColumnMetaDataExt => {
     dictionary_page_offset: emptyOffset(),
     statistics: {},
     encoding_stats: [],
-    bloom_filter_offset: emptyOffset()
-  }
-}
+    bloom_filter_offset: emptyOffset(),
+  };
+};
 
-describe("bloomFilterReader", () => {
-  describe("offsets", () => {
-    let columnChunkDataCollection: Array<ColumnChunkData>;
+describe('bloomFilterReader', function () {
+  describe('offsets', function () {
+    let columnChunkDataCollection: ColumnChunkData[];
 
-
-    beforeEach(() => {
-      const metaData: ColumnMetaDataExt = emptyMetaData()
-        metaData.path_in_schema = ["name"]
-        metaData.bloom_filter_offset = new Int64(Buffer.from("000000000874", "hex"), 0)
+    beforeEach(function () {
+      const metaData: ColumnMetaDataExt = emptyMetaData();
+      metaData.path_in_schema = ['name'];
+      metaData.bloom_filter_offset = new Int64(Buffer.from('000000000874', 'hex'), 0);
 
       const columnData: ColumnChunkExt = {
         meta_data: metaData,
         file_offset: emptyOffset(),
-        file_path: ''
-      }
+        file_path: '',
+      };
 
       columnChunkDataCollection = [
         {
@@ -50,11 +49,11 @@ describe("bloomFilterReader", () => {
       ];
     });
 
-    it("returns bloom filter offsets", () => {
+    it('returns bloom filter offsets', function () {
       const result = parseBloomFilterOffsets(columnChunkDataCollection);
       const expected = [
         {
-          columnName: "name",
+          columnName: 'name',
           offsetBytes: 2164,
           rowGroupIndex: 0,
         },
@@ -62,12 +61,12 @@ describe("bloomFilterReader", () => {
 
       expect(result).to.deep.equal(expected);
     });
-  })
-  describe("XXHasher", async () => {
-    it("outputs hex-encoded strings", async () => {
-      const hasher = await (new XxHasher());
-      assert.equal("ee7276ee58e4421c", await hasher.hash64("15"));
-    })
-  })
-});
+  });
 
+  describe('XXHasher', function () {
+    it('outputs hex-encoded strings', async function () {
+      const hasher = await new XxHasher();
+      assert.equal('ee7276ee58e4421c', await hasher.hash64('15'));
+    });
+  });
+});

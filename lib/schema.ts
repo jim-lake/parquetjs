@@ -1,20 +1,17 @@
 import * as parquet_codec from './codec';
-import * as parquet_compression from './compression'
-import * as parquet_types from './types'
-import { SchemaDefinition, ParquetField, RepetitionType, FieldDefinition } from './declare'
-import { JSONSchema4 } from 'json-schema'
+import * as parquet_compression from './compression';
+import * as parquet_types from './types';
+import { SchemaDefinition, ParquetField, RepetitionType, FieldDefinition } from './declare';
+import { JSONSchema4 } from 'json-schema';
 import { fromJsonSchema } from './jsonSchema';
-
-const PARQUET_COLUMN_KEY_SEPARATOR = '.';
-
 
 /**
  * A parquet file schema
  */
 export class ParquetSchema {
-  schema: SchemaDefinition
-  fields: Record<string, ParquetField>
-  fieldList: Array<ParquetField>
+  schema: SchemaDefinition;
+  fields: Record<string, ParquetField>;
+  fieldList: ParquetField[];
 
   /**
    * Create a new schema from JSON Schema (json-schema.org)
@@ -36,16 +33,16 @@ export class ParquetSchema {
   /**
    * Retrieve a field definition
    */
-  findField(path: string | Array<string>) {
+  findField(path: string | string[]) {
     if (typeof path === 'string') {
-      path = path.split(",");
+      path = path.split(',');
     } else {
       path = path.slice(0); // clone array
     }
 
     let n = this.fields;
     for (; path.length > 1; path.shift()) {
-      let fields = n[path[0]]?.fields
+      const fields = n[path[0]]?.fields;
       if (isDefined(fields)) {
         n = fields;
       }
@@ -57,17 +54,17 @@ export class ParquetSchema {
   /**
    * Retrieve a field definition and all the field's ancestors
    */
-  findFieldBranch(path: string | Array<string>) {
+  findFieldBranch(path: string | string[]) {
     if (typeof path === 'string') {
-      path = path.split(",");
+      path = path.split(',');
     }
 
-    let branch = [];
+    const branch = [];
     let n = this.fields;
     for (; path.length > 0; path.shift()) {
       branch.push(n[path[0]]);
 
-      let fields = n[path[0]].fields
+      const fields = n[path[0]].fields;
       if (path.length > 1 && isDefined(fields)) {
         n = fields;
       }
@@ -75,10 +72,9 @@ export class ParquetSchema {
 
     return branch;
   }
+}
 
-};
-
-function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelParentMax?: number, path?: Array<string>) {
+function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelParentMax?: number, path?: string[]) {
   if (!rLevelParentMax) {
     rLevelParentMax = 0;
   }
@@ -91,9 +87,9 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
     path = [];
   }
 
-  let fieldList: Record<string, ParquetField> = {};
-  let fieldErrors: Array<string> = [];
-  for (let name in schema) {
+  const fieldList: Record<string, ParquetField> = {};
+  let fieldErrors: string[] = [];
+  for (const name in schema) {
     const opts = schema[name];
 
     /* field repetition type */
@@ -129,11 +125,7 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
         isNested: true,
         statistics: opts.statistics,
         fieldCount: Object.keys(opts.fields).length,
-        fields: buildFields(
-            opts.fields,
-            rLevelMax,
-            dLevelMax,
-            path.concat(name))
+        fields: buildFields(opts.fields, rLevelMax, dLevelMax, path.concat(name)),
       };
 
       if (opts.type == 'LIST' || opts.type == 'MAP') fieldList[name].originalType = opts.type;
@@ -141,14 +133,14 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
       continue;
     }
 
-    let nameWithPath = (`${name}` || 'missing name')
+    let nameWithPath = `${name}` || 'missing name';
     if (path && path.length > 0) {
-      nameWithPath = `${path}.${nameWithPath}`
+      nameWithPath = `${path}.${nameWithPath}`;
     }
 
     const typeDef = opts.type ? parquet_types.getParquetTypeDataObject(opts.type, opts) : undefined;
     if (!typeDef) {
-      fieldErrors.push(`Invalid parquet type: ${(opts.type || "missing type")}, for Column: ${nameWithPath}`);
+      fieldErrors.push(`Invalid parquet type: ${opts.type || 'missing type'}, for Column: ${nameWithPath}`);
       continue;
     }
 
@@ -171,8 +163,10 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
 
     if (typeDef.originalType === 'DECIMAL') {
       // Default scale to 0 per https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#decimal
-      if (typeof opts.scale === "undefined") opts.scale = 0;
-      fieldErrors = fieldErrors.concat(errorsForDecimalOpts(typeDef.originalType, typeDef.primitiveType, opts, nameWithPath));
+      if (typeof opts.scale === 'undefined') opts.scale = 0;
+      fieldErrors = fieldErrors.concat(
+        errorsForDecimalOpts(typeDef.originalType, typeDef.primitiveType, opts, nameWithPath)
+      );
     }
 
     /* add to schema */
@@ -189,7 +183,7 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
       scale: opts.scale,
       typeLength: opts.typeLength || typeDef.typeLength,
       rLevelMax: rLevelMax,
-      dLevelMax: dLevelMax
+      dLevelMax: dLevelMax,
     };
   }
 
@@ -201,12 +195,12 @@ function buildFields(schema: SchemaDefinition, rLevelParentMax?: number, dLevelP
 }
 
 function listFields(fields: Record<string, ParquetField>) {
-  let list: Array<ParquetField> = [];
+  let list: ParquetField[] = [];
 
-  for (let k in fields) {
+  for (const k in fields) {
     list.push(fields[k]);
 
-    const nestedFields = fields[k].fields
+    const nestedFields = fields[k].fields;
     if (fields[k].isNested && isDefined(nestedFields)) {
       list = list.concat(listFields(nestedFields));
     }
@@ -219,37 +213,34 @@ function isDefined<T>(val: T | undefined): val is T {
   return val !== undefined;
 }
 
-function errorsForDecimalOpts(type: string, primitiveType: string | undefined, opts: FieldDefinition, columnName: string): string[] {
-  const fieldErrors = []
-  if(opts.precision === undefined || opts.precision < 1) {
+function errorsForDecimalOpts(
+  type: string,
+  primitiveType: string | undefined,
+  opts: FieldDefinition,
+  columnName: string
+): string[] {
+  const fieldErrors = [];
+  if (opts.precision === undefined || opts.precision < 1) {
     fieldErrors.push(
       `invalid schema for type: ${type}, for Column: ${columnName}, precision is required and must be be greater than 0`
     );
-  }
-  else if (!Number.isInteger(opts.precision)) {
-    fieldErrors.push(
-      `invalid schema for type: ${type}, for Column: ${columnName}, precision must be an integer`
-    );
-  }
-  else if (primitiveType === "INT64" && opts.precision > 18) {
+  } else if (!Number.isInteger(opts.precision)) {
+    fieldErrors.push(`invalid schema for type: ${type}, for Column: ${columnName}, precision must be an integer`);
+  } else if (primitiveType === 'INT64' && opts.precision > 18) {
     fieldErrors.push(
       `invalid schema for type: ${type} and primitive type: ${primitiveType} for Column: ${columnName}, can not handle precision over 18`
     );
   }
-  if (typeof opts.scale === "undefined" || opts.scale < 0) {
+  if (typeof opts.scale === 'undefined' || opts.scale < 0) {
     fieldErrors.push(
       `invalid schema for type: ${type}, for Column: ${columnName}, scale is required to be 0 or greater`
     );
-  }
-  else if (!Number.isInteger(opts.scale)) {
-    fieldErrors.push(
-      `invalid schema for type: ${type}, for Column: ${columnName}, scale must be an integer`
-    );
-  }
-  else if (opts.precision !== undefined && opts.scale > opts.precision) {
+  } else if (!Number.isInteger(opts.scale)) {
+    fieldErrors.push(`invalid schema for type: ${type}, for Column: ${columnName}, scale must be an integer`);
+  } else if (opts.precision !== undefined && opts.scale > opts.precision) {
     fieldErrors.push(
       `invalid schema or precision for type: ${type}, for Column: ${columnName}, precision must be greater than or equal to scale`
     );
   }
-  return fieldErrors
+  return fieldErrors;
 }

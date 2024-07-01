@@ -1,16 +1,16 @@
-import * as parquet_util from "../util";
-import parquet_thrift from "../../gen-nodejs/parquet_types";
-import SplitBlockBloomFilter from "../bloom/sbbf";
+import * as parquet_util from '../util';
+import parquet_thrift from '../../gen-nodejs/parquet_types';
+import SplitBlockBloomFilter from '../bloom/sbbf';
 
-import { Block } from "../declare";
-import Int64 from 'node-int64'
+import { Block } from '../declare';
+import Int64 from 'node-int64';
 
-export type createSBBFParams = {
+export interface createSBBFParams {
   numFilterBytes?: number;
   falsePositiveRate?: number;
   numDistinct?: number;
   column?: any;
-};
+}
 
 export const createSBBF = (params: createSBBFParams): SplitBlockBloomFilter => {
   const { numFilterBytes, falsePositiveRate, numDistinct } = params;
@@ -21,18 +21,16 @@ export const createSBBF = (params: createSBBFParams): SplitBlockBloomFilter => {
 
   if (!hasOptions) return bloomFilter.init();
 
-  if (numFilterBytes)
-    return bloomFilter.setOptionNumFilterBytes(numFilterBytes).init();
+  if (numFilterBytes) return bloomFilter.setOptionNumFilterBytes(numFilterBytes).init();
 
-  if (falsePositiveRate)
-    bloomFilter.setOptionFalsePositiveRate(falsePositiveRate);
+  if (falsePositiveRate) bloomFilter.setOptionFalsePositiveRate(falsePositiveRate);
 
   if (numDistinct) bloomFilter.setOptionNumDistinct(numDistinct);
 
   return bloomFilter.init();
 };
 
-const serializeFilterBlocks = (blocks: Array<Block>): Buffer =>
+const serializeFilterBlocks = (blocks: Block[]): Buffer =>
   Buffer.concat(blocks.map((block) => Buffer.from(block.buffer)));
 
 const buildFilterHeader = (numBytes: number) => {
@@ -51,10 +49,10 @@ export const serializeFilterHeaders = (numberOfBytes: number) => {
   return parquet_util.serializeThrift(bloomFilterHeader);
 };
 
-type serializeFilterDataParams = {
-  filterBlocks: Array<Block>;
+interface serializeFilterDataParams {
+  filterBlocks: Block[];
   filterByteSize: number;
-};
+}
 
 export const serializeFilterData = (params: serializeFilterDataParams) => {
   const serializedFilterBlocks = serializeFilterBlocks(params.filterBlocks);
