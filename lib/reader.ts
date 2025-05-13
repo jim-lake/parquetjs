@@ -124,6 +124,7 @@ export class ParquetReader {
   envelopeReader: ParquetEnvelopeReader | null;
   metadata: FileMetaDataExt | null;
   schema: parquet_schema.ParquetSchema;
+  treatInt96AsTimestamp: boolean;
 
   /**
    * Open the parquet file pointed to by the specified path and return a new
@@ -198,6 +199,9 @@ export class ParquetReader {
     if (!PARQUET_VERSIONS.includes(metadata.version)) {
       throw 'invalid parquet version';
     }
+
+    // Default to false for backward compatibility
+    this.treatInt96AsTimestamp = opts.treatInt96AsTimestamp === true;
 
     // If metadata is a json file then we need to convert INT64 and CTIME
     if (metadata.json) {
@@ -411,6 +415,7 @@ export class ParquetEnvelopeReader {
   default_dictionary_size: number;
   metadata?: FileMetaDataExt;
   schema?: parquet_schema.ParquetSchema;
+  treatInt96AsTimestamp?: boolean;
 
   static async openFile(filePath: string | Buffer | URL, options?: BufferReaderOptions) {
     const fileStat = await parquet_util.fstat(filePath);
@@ -564,6 +569,7 @@ export class ParquetEnvelopeReader {
     this.fileSize = fileSize;
     this.default_dictionary_size = options.default_dictionary_size || 10000000;
     this.metadata = metadata;
+    this.treatInt96AsTimestamp = options.treatInt96AsTimestamp === true;
     if (options.maxLength || options.maxSpan || options.queueWait) {
       const bufferReader = new BufferReader(this, options);
       this.read = (offset, length) => bufferReader.read(offset, length);
@@ -755,6 +761,7 @@ export class ParquetEnvelopeReader {
       compression: compression,
       column: field,
       num_values: metadata.num_values,
+      treatInt96AsTimestamp: this.treatInt96AsTimestamp,
     });
 
     // If this exists and is greater than zero then we need to have an offset
@@ -1046,6 +1053,7 @@ async function decodeDataPage(cursor: Cursor, header: parquet_thrift.PageHeader,
     precision: opts.column!.precision,
     scale: opts.column!.scale,
     name: opts.column!.name,
+    treatInt96AsTimestamp: opts.treatInt96AsTimestamp,
   });
 
   cursor.offset = cursorEnd;
@@ -1109,6 +1117,7 @@ async function decodeDataPageV2(cursor: Cursor, header: parquet_thrift.PageHeade
 
   const values = decodeValues(opts.type!, valueEncoding as ParquetCodec, valuesBufCursor, valueCountNonNull, {
     bitWidth: opts.column!.typeLength!,
+    treatInt96AsTimestamp: opts.treatInt96AsTimestamp,
     ...opts.column!,
   });
 
