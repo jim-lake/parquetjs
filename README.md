@@ -3,7 +3,7 @@
 fully asynchronous, pure node.js implementation of the Parquet file format
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![npm version](https://badge.fury.io/js/%40unfinishedlabs%2Fparquet-js.svg)](https://badge.fury.io/js/%40dsnp%2Fparquetjs)
+![NPM Version](https://img.shields.io/npm/v/%40dsnp%2Fparquetjs)
 
 This package contains a fully asynchronous, pure JavaScript implementation of
 the [Parquet](https://parquet.apache.org/) file format. The implementation conforms with the
