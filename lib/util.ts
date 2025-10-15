@@ -6,7 +6,10 @@ import { FileMetaDataExt, WriterOptions } from './declare';
 import { Int64 } from 'thrift';
 
 // Use this so users only need to implement the minimal amount of the WriteStream interface
-export type WriteStreamMinimal = Pick<WriteStream, 'write' | 'end'>;
+export interface  WriteStreamMinimal {
+  write(buf: Buffer, cb: (err: Error | null | undefined) => void): void;
+  end(cb: (err?: Error | null | undefined) => void): void;
+}
 
 const WRITE = Symbol.for('write');
 const READ = Symbol.for('read');
@@ -171,7 +174,7 @@ export const fclose = function (fd: number) {
 
 export const oswrite = function (os: WriteStreamMinimal, buf: Buffer) {
   return new Promise((resolve, reject) => {
-    os.write(buf, (err: Error | undefined | null) => {
+    os.write(buf, (err) => {
       if (err) {
         reject(err);
       } else {
@@ -183,7 +186,7 @@ export const oswrite = function (os: WriteStreamMinimal, buf: Buffer) {
 
 export const osend = function (os: WriteStreamMinimal) {
   return new Promise((resolve, reject) => {
-    os.end((err: Error) => {
+    os.end((err) => {
       if (err) {
         reject(err);
       } else {

@@ -3,7 +3,10 @@ import fs, { WriteStream } from 'fs';
 import * as parquet_thrift from '../gen-nodejs/parquet_types';
 import { FileMetaDataExt, WriterOptions } from './declare';
 import { Int64 } from 'thrift';
-export type WriteStreamMinimal = Pick<WriteStream, 'write' | 'end'>;
+export interface WriteStreamMinimal {
+    write(buf: Buffer, cb: (err: Error | null | undefined) => void): void;
+    end(cb: (err?: Error | null | undefined) => void): void;
+}
 type Enums = typeof parquet_thrift.Encoding | typeof parquet_thrift.FieldRepetitionType | typeof parquet_thrift.Type | typeof parquet_thrift.CompressionCodec | typeof parquet_thrift.PageType | typeof parquet_thrift.ConvertedType;
 type ThriftObject = FileMetaDataExt | parquet_thrift.PageHeader | parquet_thrift.ColumnMetaData | parquet_thrift.BloomFilterHeader | parquet_thrift.OffsetIndex | parquet_thrift.ColumnIndex | FileMetaDataExt;
 /**
