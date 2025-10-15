@@ -16,7 +16,7 @@ import { createSBBFParams } from './bloomFilterIO/bloomFilterWriter';
 import Int64 from 'node-int64';
 
 export type ParquetCodec = 'PLAIN' | 'RLE';
-export type ParquetCompression = 'UNCOMPRESSED' | 'GZIP' | 'SNAPPY' | 'LZO' | 'BROTLI' | 'LZ4';
+export type ParquetCompression = 'UNCOMPRESSED' | 'GZIP' | 'SNAPPY' | 'LZO' | 'BROTLI' | 'LZ4' | 'ZSTD';
 export type RepetitionType = 'REQUIRED' | 'OPTIONAL' | 'REPEATED';
 export type ParquetType = PrimitiveType | OriginalType;
 
