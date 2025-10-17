@@ -459,7 +459,11 @@ function toPrimitive_BYTE_ARRAY(value: number[]) {
 }
 
 function toPrimitive_UTF8(value: string) {
-  return Buffer.from(value, 'utf8');
+  // Optimize for common case - if it's already a string, convert directly
+  if (typeof value === 'string') {
+    return Buffer.from(value, 'utf8');
+  }
+  return Buffer.from(String(value), 'utf8');
 }
 
 function fromPrimitive_UTF8(value: string) {

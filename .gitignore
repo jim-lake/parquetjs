@@ -11,3 +11,4 @@ test/browser/*.js
 main.js
 main.js.map
 /AI*.md
+isolate*.log

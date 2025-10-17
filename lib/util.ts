@@ -6,7 +6,7 @@ import { FileMetaDataExt, WriterOptions } from './declare';
 import { Int64 } from 'thrift';
 
 // Use this so users only need to implement the minimal amount of the WriteStream interface
-export interface  WriteStreamMinimal {
+export interface WriteStreamMinimal {
   write(buf: Buffer, cb: (err: Error | null | undefined) => void): void;
   end(cb: (err?: Error | null | undefined) => void): void;
 }

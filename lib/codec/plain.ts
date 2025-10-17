@@ -241,18 +241,42 @@ function decodeValues_DOUBLE(cursor: Cursor, count: number) {
 
 function encodeValues_BYTE_ARRAY(values: Uint8Array[]) {
   let buf_len = 0;
-  const returnedValues: Buffer[] = [];
+
+  // Calculate total buffer size in single pass
   for (let i = 0; i < values.length; i++) {
-    returnedValues[i] = Buffer.from(values[i]);
-    buf_len += 4 + returnedValues[i].length;
+    const value = values[i];
+    if (typeof value === 'string') {
+      buf_len += 4 + Buffer.byteLength(value, 'utf8');
+    } else {
+      buf_len += 4 + value.length;
+    }
   }
 
   const buf = Buffer.alloc(buf_len);
   let buf_pos = 0;
-  for (let i = 0; i < returnedValues.length; i++) {
-    buf.writeUInt32LE(returnedValues[i].length, buf_pos);
-    returnedValues[i].copy(buf, buf_pos + 4);
-    buf_pos += 4 + returnedValues[i].length;
+
+  // Write directly without intermediate Buffer.from calls
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+
+    if (typeof value === 'string') {
+      const byteLength = Buffer.byteLength(value, 'utf8');
+      buf.writeUInt32LE(byteLength, buf_pos);
+      buf_pos += 4;
+      buf.write(value, buf_pos, 'utf8');
+      buf_pos += byteLength;
+    } else {
+      buf.writeUInt32LE(value.length, buf_pos);
+      buf_pos += 4;
+
+      // Direct copy without Buffer.from
+      if (Buffer.isBuffer(value)) {
+        value.copy(buf, buf_pos);
+      } else {
+        buf.set(value, buf_pos);
+      }
+      buf_pos += value.length;
+    }
   }
 
   return buf;
