@@ -2,7 +2,7 @@ import INT53 from 'int53';
 import { Cursor, Options } from './types';
 
 function encodeValues_BOOLEAN(values: boolean[]) {
-  const buf = Buffer.alloc(Math.ceil(values.length / 8));
+  const buf = Buffer.allocUnsafe(Math.ceil(values.length / 8));
   buf.fill(0);
 
   for (let i = 0; i < values.length; ++i) {
@@ -29,11 +29,15 @@ function decodeValues_BOOLEAN(cursor: Cursor, count: number) {
 function encodeValues_INT32(values: number[], opts: Options) {
   const isDecimal = opts?.originalType === 'DECIMAL' || opts?.column?.originalType === 'DECIMAL';
   const scale = opts?.scale || 0;
-  const buf = Buffer.alloc(4 * values.length);
-  for (let i = 0; i < values.length; i++) {
-    if (isDecimal) {
-      buf.writeInt32LE(values[i] * Math.pow(10, scale), i * 4);
-    } else {
+  const buf = Buffer.allocUnsafe(4 * values.length);
+
+  if (isDecimal) {
+    const multiplier = Math.pow(10, scale);
+    for (let i = 0; i < values.length; i++) {
+      buf.writeInt32LE(values[i] * multiplier, i * 4);
+    }
+  } else {
+    for (let i = 0; i < values.length; i++) {
       buf.writeInt32LE(values[i], i * 4);
     }
   }
@@ -64,12 +68,20 @@ function decodeValues_INT32(cursor: Cursor, count: number, opts: Options) {
 function encodeValues_INT64(values: number[], opts: Options) {
   const isDecimal = opts?.originalType === 'DECIMAL' || opts?.column?.originalType === 'DECIMAL';
   const scale = opts?.scale || 0;
-  const buf = Buffer.alloc(8 * values.length);
-  for (let i = 0; i < values.length; i++) {
-    if (isDecimal) {
-      buf.writeBigInt64LE(BigInt(Math.floor(values[i] * Math.pow(10, scale))), i * 8);
-    } else {
-      buf.writeBigInt64LE(BigInt(values[i]), i * 8);
+  const buf = Buffer.allocUnsafe(8 * values.length);
+
+  if (isDecimal) {
+    const multiplier = Math.pow(10, scale);
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      const bigIntValue = typeof value === 'bigint' ? value : BigInt(Math.floor(value * multiplier));
+      buf.writeBigInt64LE(bigIntValue, i * 8);
+    }
+  } else {
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      const bigIntValue = typeof value === 'bigint' ? value : BigInt(value);
+      buf.writeBigInt64LE(bigIntValue, i * 8);
     }
   }
 
@@ -131,7 +143,7 @@ function decodeValues_DECIMAL(cursor: Cursor, count: number, opts: Options) {
 }
 
 function encodeValues_INT96(values: number[]) {
-  const buf = Buffer.alloc(12 * values.length);
+  const buf = Buffer.allocUnsafe(12 * values.length);
 
   for (let i = 0; i < values.length; i++) {
     if (values[i] >= 0) {
@@ -200,7 +212,7 @@ function convertInt96ToTimestamp(julianDay: number, nanosSinceMidnight: number |
 }
 
 function encodeValues_FLOAT(values: number[]) {
-  const buf = Buffer.alloc(4 * values.length);
+  const buf = Buffer.allocUnsafe(4 * values.length);
   for (let i = 0; i < values.length; i++) {
     buf.writeFloatLE(values[i], i * 4);
   }
@@ -220,7 +232,7 @@ function decodeValues_FLOAT(cursor: Cursor, count: number) {
 }
 
 function encodeValues_DOUBLE(values: number[]) {
-  const buf = Buffer.alloc(8 * values.length);
+  const buf = Buffer.allocUnsafe(8 * values.length);
   for (let i = 0; i < values.length; i++) {
     buf.writeDoubleLE(values[i], i * 8);
   }
@@ -298,16 +310,33 @@ function encodeValues_FIXED_LEN_BYTE_ARRAY(values: Uint8Array[], opts: Options) 
     throw new Error('missing option: typeLength (required for FIXED_LEN_BYTE_ARRAY)');
   }
 
-  const returnedValues: Buffer[] = [];
-  for (let i = 0; i < values.length; i++) {
-    returnedValues[i] = Buffer.from(values[i]);
+  const typeLength = opts.typeLength;
+  const buf = Buffer.allocUnsafe(typeLength * values.length);
 
-    if (returnedValues[i].length !== opts.typeLength) {
-      throw new Error('invalid value for FIXED_LEN_BYTE_ARRAY: ' + returnedValues[i]);
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+    const offset = i * typeLength;
+
+    if (typeof value === 'string') {
+      const stringBuf = Buffer.from(value, 'utf8');
+      if (stringBuf.length !== typeLength) {
+        throw new Error('invalid value for FIXED_LEN_BYTE_ARRAY: ' + value);
+      }
+      stringBuf.copy(buf, offset);
+    } else {
+      if (value.length !== typeLength) {
+        throw new Error('invalid value for FIXED_LEN_BYTE_ARRAY: ' + value);
+      }
+
+      if (Buffer.isBuffer(value)) {
+        value.copy(buf, offset);
+      } else {
+        buf.set(value, offset);
+      }
     }
   }
 
-  return Buffer.concat(returnedValues);
+  return buf;
 }
 
 function decodeValues_FIXED_LEN_BYTE_ARRAY(cursor: Cursor, count: number, opts: Options) {
