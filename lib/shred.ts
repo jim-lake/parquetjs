@@ -74,14 +74,6 @@ function shredRecordInternal(
     const path = field.path.join(',');
     const column = data[path];
 
-    // Cache toPrimitive function to avoid repeated lookups
-    let toPrimitiveFunc: ((value: unknown) => unknown) | null = null;
-    if (!field.isNested) {
-      // Get the toPrimitive function once per field
-      const typeData = parquet_types.getParquetTypeDataObject(fieldType as ParquetType, field);
-      toPrimitiveFunc = typeData.toPrimitive;
-    }
-
     // fetch values
     let values: unknown[] = [];
     if (record && fieldName in record && record[fieldName] !== undefined && record[fieldName] !== null) {
@@ -129,8 +121,8 @@ function shredRecordInternal(
         shredRecordInternal(field.fields, values[i] as Record<string, unknown>, data, rlvl_i, field.dLevelMax);
       } else {
         column.distinct_values!.add(values[i]);
-        // Use cached toPrimitive function instead of dispatcher
-        column.values!.push(toPrimitiveFunc!(values[i]) as any);
+        const typeData = parquet_types.getParquetTypeDataObject(fieldType as ParquetType, field);
+        column.values!.push(typeData.toPrimitive(values[i]) as any);
         column.rlevels!.push(rlvl_i as number);
         column.dlevels!.push(field.dLevelMax);
         column.count! += 1;

@@ -213,40 +213,38 @@ function decodeValues_DOUBLE(cursor, count) {
 }
 function encodeValues_BYTE_ARRAY(values) {
     let buf_len = 0;
-    // Calculate total buffer size in single pass
+    const lengths = new Array(values.length);
+    // Calculate total buffer size and cache lengths in single pass
     for (let i = 0; i < values.length; i++) {
         const value = values[i];
+        let length;
         if (typeof value === 'string') {
-            buf_len += 4 + Buffer.byteLength(value, 'utf8');
+            length = Buffer.byteLength(value, 'utf8');
         }
         else {
-            buf_len += 4 + value.length;
+            length = value.length;
         }
+        lengths[i] = length;
+        buf_len += 4 + length;
     }
-    const buf = Buffer.alloc(buf_len);
+    const buf = Buffer.allocUnsafe(buf_len);
     let buf_pos = 0;
-    // Write directly without intermediate Buffer.from calls
+    // Write directly using cached lengths
     for (let i = 0; i < values.length; i++) {
         const value = values[i];
+        const length = lengths[i];
+        buf.writeUInt32LE(length, buf_pos);
+        buf_pos += 4;
         if (typeof value === 'string') {
-            const byteLength = Buffer.byteLength(value, 'utf8');
-            buf.writeUInt32LE(byteLength, buf_pos);
-            buf_pos += 4;
             buf.write(value, buf_pos, 'utf8');
-            buf_pos += byteLength;
+        }
+        else if (Buffer.isBuffer(value)) {
+            value.copy(buf, buf_pos);
         }
         else {
-            buf.writeUInt32LE(value.length, buf_pos);
-            buf_pos += 4;
-            // Direct copy without Buffer.from
-            if (Buffer.isBuffer(value)) {
-                value.copy(buf, buf_pos);
-            }
-            else {
-                buf.set(value, buf_pos);
-            }
-            buf_pos += value.length;
+            buf.set(value, buf_pos);
         }
+        buf_pos += length;
     }
     return buf;
 }
