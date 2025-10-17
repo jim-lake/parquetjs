@@ -4,6 +4,8 @@ import * as parquet from '../parquet';
 const ROWS_PER_BATCH = 10_000;
 const RUNS = 3;
 const DURATION = 5;
+const ROW_GROUP_SIZE = 4096;
+const PAGE_SIZE = 8192;
 
 let totalBytesWritten = 0;
 
@@ -47,6 +49,8 @@ async function writeBatch(): Promise<void> {
   stream.on('data', () => {});
   
   const writer = await parquet.ParquetWriter.openStream(schema, stream);
+  writer.setRowGroupSize(ROW_GROUP_SIZE);
+  writer.setPageSize(PAGE_SIZE);
   
   for (let i = 0; i < ROWS_PER_BATCH; i++) {
     await writer.appendRow(template);
