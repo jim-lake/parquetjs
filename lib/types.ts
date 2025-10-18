@@ -510,7 +510,7 @@ function toPrimitive_TIME_MILLIS(value: string | number) {
 }
 
 function toPrimitive_TIME_MICROS(value: string | number | bigint) {
-  const v = BigInt(value);
+  const v = typeof value === 'bigint' ? value : BigInt(value);
   if (v < 0n) {
     throw new Error('TIME_MICROS value is out of bounds: ' + value);
   }
@@ -544,19 +544,22 @@ function fromPrimitive_TIMESTAMP_MILLIS(value: number | string | bigint) {
 }
 
 function toPrimitive_TIMESTAMP_MICROS(value: Date | string | number | bigint) {
-  /* convert from date */
+  if (typeof value === 'bigint') {
+    if (value < 0n) {
+      throw new Error('out of bounds');
+    }
+    return value;
+  }
   if (value instanceof Date) {
     return BigInt(value.getTime()) * 1000n;
   }
 
-  /* convert from integer */
   try {
-    // Will throw if NaN
+    // Will throw on lots of cases for strings/numbers
     const v = BigInt(value);
     if (v < 0n) {
       throw new Error('out of bounds');
     }
-
     return v;
   } catch (_e) {
     throw new Error('TIMESTAMP_MICROS value is out of bounds: ' + value);
