@@ -6,7 +6,7 @@ import * as parquet_codec from './codec';
 import * as parquet_compression from './compression';
 import * as parquet_types from './types';
 import * as bloomFilterWriter from './bloomFilterIO/bloomFilterWriter';
-import { WriterOptions, ParquetCodec, ParquetField, ColumnMetaDataExt, RowGroupExt, Page } from './declare';
+import { WriterOptions, ParquetCodec, ParquetField, ColumnMetaDataExt, RowGroupExt, Page, ParquetType } from './declare';
 import { Options } from './codec/types';
 import { ParquetSchema } from './schema';
 import Int64 from 'node-int64';
@@ -476,50 +476,50 @@ async function encodePages(
 
     // Convert raw values to primitives and generate statistics
     const fieldType = field.originalType || field.primitiveType;
-    const typeData = parquet_types.getParquetTypeDataObject(fieldType as parquet_types.ParquetType, field);
-    const primitiveValues: any[] = [];
-    const distinctValues = new Set();
+    const typeData = parquet_types.getParquetTypeDataObject(fieldType as ParquetType, field);
+    const primitive_values: any[] = [];
+    const distinct_values = new Set();
 
     for (const rawValue of values.values!) {
       const primitiveValue = typeData.toPrimitive(rawValue);
-      primitiveValues.push(primitiveValue);
-      distinctValues.add(rawValue);
+      primitive_values.push(primitiveValue);
+      distinct_values.add(rawValue);
     }
 
     if (opts.bloomFilters && columnPath in opts.bloomFilters) {
       const splitBlockBloomFilter = opts.bloomFilters[columnPath];
-      primitiveValues.forEach((v) => splitBlockBloomFilter.insert(v));
+      primitive_values.forEach((v) => splitBlockBloomFilter.insert(v));
     }
 
     let statistics: parquet_thrift.Statistics = {};
     if (field.statistics !== false) {
       statistics = {};
-      [...distinctValues].forEach((v, i) => {
+      [...distinct_values].forEach((v: any, i) => {
         if (i === 0) {
-          statistics.max_value = v;
-          statistics.min_value = v;
+          statistics.max_value = v as Buffer;
+          statistics.min_value = v as Buffer;
         } else {
-          const { min_value, max_value } = compareStatistics(v, statistics);
-          if (min_value !== undefined) statistics.min_value = min_value;
-          if (max_value !== undefined) statistics.max_value = max_value;
+          const { min_value, max_value } = compareStatistics(v as any, statistics);
+          if (min_value !== undefined) statistics.min_value = min_value as Buffer;
+          if (max_value !== undefined) statistics.max_value = max_value as Buffer;
         }
       });
 
       statistics.null_count = new Int64(values.dlevels!.length - values.values!.length);
-      statistics.distinct_count = new Int64(distinctValues.size);
+      statistics.distinct_count = new Int64(distinct_values.size);
     }
 
     if (opts.useDataPageV2) {
       page = await encodeDataPageV2(
         field,
         values.count!,
-        primitiveValues,
+        primitive_values,
         values.rlevels!,
         values.dlevels!,
         statistics!
       );
     } else {
-      page = await encodeDataPage(field, primitiveValues, values.rlevels || [], values.dlevels || [], statistics!);
+      page = await encodeDataPage(field, primitive_values, values.rlevels || [], values.dlevels || [], statistics!);
     }
 
     const pages = rowBuffer.pages![field.path.join(',')];
@@ -529,7 +529,7 @@ async function encodePages(
       page,
       statistics,
       first_row_index,
-      distinct_values: distinctValues,
+      distinct_values: distinct_values,
       num_values: values.dlevels!.length,
     });
 

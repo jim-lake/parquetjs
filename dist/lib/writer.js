@@ -421,14 +421,24 @@ async function encodePages(schema, rowBuffer, opts) {
         let page;
         const columnPath = field.path.join(',');
         const values = rowBuffer.columnData[columnPath];
+        // Convert raw values to primitives and generate statistics
+        const fieldType = field.originalType || field.primitiveType;
+        const typeData = parquet_types.getParquetTypeDataObject(fieldType, field);
+        const primitive_values = [];
+        const distinct_values = new Set();
+        for (const rawValue of values.values) {
+            const primitiveValue = typeData.toPrimitive(rawValue);
+            primitive_values.push(primitiveValue);
+            distinct_values.add(rawValue);
+        }
         if (opts.bloomFilters && columnPath in opts.bloomFilters) {
             const splitBlockBloomFilter = opts.bloomFilters[columnPath];
-            values.values.forEach((v) => splitBlockBloomFilter.insert(v));
+            primitive_values.forEach((v) => splitBlockBloomFilter.insert(v));
         }
         let statistics = {};
         if (field.statistics !== false) {
             statistics = {};
-            [...values.distinct_values].forEach((v, i) => {
+            [...distinct_values].forEach((v, i) => {
                 if (i === 0) {
                     statistics.max_value = v;
                     statistics.min_value = v;
@@ -442,13 +452,13 @@ async function encodePages(schema, rowBuffer, opts) {
                 }
             });
             statistics.null_count = new node_int64_1.default(values.dlevels.length - values.values.length);
-            statistics.distinct_count = new node_int64_1.default(values.distinct_values.size);
+            statistics.distinct_count = new node_int64_1.default(distinct_values.size);
         }
         if (opts.useDataPageV2) {
-            page = await encodeDataPageV2(field, values.count, values.values, values.rlevels, values.dlevels, statistics);
+            page = await encodeDataPageV2(field, values.count, primitive_values, values.rlevels, values.dlevels, statistics);
         }
         else {
-            page = await encodeDataPage(field, values.values || [], values.rlevels || [], values.dlevels || [], statistics);
+            page = await encodeDataPage(field, primitive_values, values.rlevels || [], values.dlevels || [], statistics);
         }
         const pages = rowBuffer.pages[field.path.join(',')];
         const lastPage = pages[pages.length - 1];
@@ -457,10 +467,9 @@ async function encodePages(schema, rowBuffer, opts) {
             page,
             statistics,
             first_row_index,
-            distinct_values: values.distinct_values,
+            distinct_values: distinct_values,
             num_values: values.dlevels.length,
         });
-        values.distinct_values = new Set();
         values.values = [];
         values.rlevels = [];
         values.dlevels = [];

@@ -91,8 +91,7 @@ export interface Parameter {
 export interface PageData {
     rlevels?: number[];
     dlevels?: number[];
-    distinct_values?: Set<any>;
-    values?: number[];
+    values?: any[];
     pageHeaders?: PageHeader[];
     pageHeader?: PageHeader;
     count?: number;
