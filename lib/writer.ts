@@ -143,7 +143,6 @@ export class ParquetWriter {
       await this.envelopeWriter.writeIndex();
       await this.envelopeWriter.writeFooter(this.userMetadata);
       await this.envelopeWriter.close();
-      this.envelopeWriter = null;
     }
 
     if (callback) {
