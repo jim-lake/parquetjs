@@ -47,7 +47,6 @@ export const shredRecord = function (schema: ParquetSchema, record: Record<strin
         dlevels: [],
         rlevels: [],
         values: [],
-        distinct_values: new Set(),
         count: 0,
       };
       buffer.pages[path] = [];
@@ -120,9 +119,8 @@ function shredRecordInternal(
       if (field.isNested && isDefined(field.fields)) {
         shredRecordInternal(field.fields, values[i] as Record<string, unknown>, data, rlvl_i, field.dLevelMax);
       } else {
-        column.distinct_values!.add(values[i]);
-        const typeData = parquet_types.getParquetTypeDataObject(fieldType as ParquetType, field);
-        column.values!.push(typeData.toPrimitive(values[i]) as any);
+        // Store raw values, defer toPrimitive until encodePages
+        column.values!.push(values[i] as any);
         column.rlevels!.push(rlvl_i as number);
         column.dlevels!.push(field.dLevelMax);
         column.count! += 1;

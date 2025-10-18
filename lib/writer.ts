@@ -474,15 +474,27 @@ async function encodePages(
     const columnPath = field.path.join(',');
     const values = rowBuffer.columnData![columnPath];
 
+    // Convert raw values to primitives and generate statistics
+    const fieldType = field.originalType || field.primitiveType;
+    const typeData = parquet_types.getParquetTypeDataObject(fieldType as parquet_types.ParquetType, field);
+    const primitiveValues: any[] = [];
+    const distinctValues = new Set();
+
+    for (const rawValue of values.values!) {
+      const primitiveValue = typeData.toPrimitive(rawValue);
+      primitiveValues.push(primitiveValue);
+      distinctValues.add(rawValue);
+    }
+
     if (opts.bloomFilters && columnPath in opts.bloomFilters) {
       const splitBlockBloomFilter = opts.bloomFilters[columnPath];
-      values.values!.forEach((v) => splitBlockBloomFilter.insert(v));
+      primitiveValues.forEach((v) => splitBlockBloomFilter.insert(v));
     }
 
     let statistics: parquet_thrift.Statistics = {};
     if (field.statistics !== false) {
       statistics = {};
-      [...values.distinct_values!].forEach((v, i) => {
+      [...distinctValues].forEach((v, i) => {
         if (i === 0) {
           statistics.max_value = v;
           statistics.min_value = v;
@@ -494,20 +506,20 @@ async function encodePages(
       });
 
       statistics.null_count = new Int64(values.dlevels!.length - values.values!.length);
-      statistics.distinct_count = new Int64(values.distinct_values!.size);
+      statistics.distinct_count = new Int64(distinctValues.size);
     }
 
     if (opts.useDataPageV2) {
       page = await encodeDataPageV2(
         field,
         values.count!,
-        values.values!,
+        primitiveValues,
         values.rlevels!,
         values.dlevels!,
         statistics!
       );
     } else {
-      page = await encodeDataPage(field, values.values || [], values.rlevels || [], values.dlevels || [], statistics!);
+      page = await encodeDataPage(field, primitiveValues, values.rlevels || [], values.dlevels || [], statistics!);
     }
 
     const pages = rowBuffer.pages![field.path.join(',')];
@@ -517,11 +529,10 @@ async function encodePages(
       page,
       statistics,
       first_row_index,
-      distinct_values: values.distinct_values!,
+      distinct_values: distinctValues,
       num_values: values.dlevels!.length,
     });
 
-    values.distinct_values = new Set();
     values.values = [];
     values.rlevels = [];
     values.dlevels = [];
