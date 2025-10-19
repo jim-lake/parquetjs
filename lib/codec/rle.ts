@@ -4,6 +4,7 @@
 
 import varint from 'varint';
 import { Cursor } from './types';
+import { encodeValuesBigInt } from './rle_bigint';
 
 function encodeRunBitpacked(values: number[], opts: { bitWidth: number }) {
   for (let i = 0; i < values.length % 8; i++) {
@@ -54,7 +55,7 @@ export const encodeValues = function (
   }
 
   if (opts.bitWidth > 32) {
-    throw new Error('typeLength cannot be greater than 32');
+    return encodeValuesBigInt(type, values, opts);
   }
 
   switch (type) {
