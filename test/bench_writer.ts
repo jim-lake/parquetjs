@@ -160,5 +160,6 @@ async function main() {
   console.log('');
   console.log(`Total bytes written: ${Intl.NumberFormat().format(totalBytesWritten)}`);
 }
-
-main().catch(console.error);
+if (require.main === module) {
+  main().catch(console.error);
+}

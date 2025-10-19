@@ -6,7 +6,15 @@ import * as parquet_codec from './codec';
 import * as parquet_compression from './compression';
 import * as parquet_types from './types';
 import * as bloomFilterWriter from './bloomFilterIO/bloomFilterWriter';
-import { WriterOptions, ParquetCodec, ParquetField, ColumnMetaDataExt, RowGroupExt, Page, ParquetType } from './declare';
+import {
+  WriterOptions,
+  ParquetCodec,
+  ParquetField,
+  ColumnMetaDataExt,
+  RowGroupExt,
+  Page,
+  ParquetType,
+} from './declare';
 import { Options } from './codec/types';
 import { ParquetSchema } from './schema';
 import Int64 from 'node-int64';
@@ -392,7 +400,14 @@ function encodeStatisticsValue(value: any, column: ParquetField | Options) {
   if (value === undefined) {
     return Buffer.alloc(0);
   }
-  if (column.originalType) {
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+  if (column.originalType === 'UTF8') {
+    if (typeof value === 'string') {
+      value = Buffer.from(value, 'utf8');
+    }
+  } else if (column.originalType) {
     value = parquet_types.toPrimitive(column.originalType, value, column);
   }
   if (column.primitiveType !== 'BYTE_ARRAY') {
@@ -488,20 +503,24 @@ async function encodePages(
 
     if (opts.bloomFilters && columnPath in opts.bloomFilters) {
       const splitBlockBloomFilter = opts.bloomFilters[columnPath];
-      primitive_values.forEach((v) => splitBlockBloomFilter.insert(v));
+      distinct_values.forEach((v) => splitBlockBloomFilter.insert(v));
     }
 
     let statistics: parquet_thrift.Statistics = {};
     if (field.statistics !== false) {
       statistics = {};
-      [...distinct_values].forEach((v: any, i) => {
-        if (i === 0) {
+      distinct_values.forEach((v: any) => {
+        if (statistics.min_value === undefined) {
           statistics.max_value = v as Buffer;
           statistics.min_value = v as Buffer;
         } else {
           const { min_value, max_value } = compareStatistics(v as any, statistics);
-          if (min_value !== undefined) statistics.min_value = min_value as Buffer;
-          if (max_value !== undefined) statistics.max_value = max_value as Buffer;
+          if (min_value !== undefined) {
+            statistics.min_value = min_value as Buffer;
+          }
+          if (max_value !== undefined) {
+            statistics.max_value = max_value as Buffer;
+          }
         }
       });
 

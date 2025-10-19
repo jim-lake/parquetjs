@@ -362,7 +362,15 @@ function encodeStatisticsValue(value, column) {
     if (value === undefined) {
         return Buffer.alloc(0);
     }
-    if (column.originalType) {
+    if (Buffer.isBuffer(value)) {
+        return value;
+    }
+    if (column.originalType === 'UTF8') {
+        if (typeof value === 'string') {
+            value = Buffer.from(value, 'utf8');
+        }
+    }
+    else if (column.originalType) {
         value = parquet_types.toPrimitive(column.originalType, value, column);
     }
     if (column.primitiveType !== 'BYTE_ARRAY') {
@@ -433,22 +441,24 @@ async function encodePages(schema, rowBuffer, opts) {
         }
         if (opts.bloomFilters && columnPath in opts.bloomFilters) {
             const splitBlockBloomFilter = opts.bloomFilters[columnPath];
-            primitive_values.forEach((v) => splitBlockBloomFilter.insert(v));
+            distinct_values.forEach((v) => splitBlockBloomFilter.insert(v));
         }
         let statistics = {};
         if (field.statistics !== false) {
             statistics = {};
-            [...distinct_values].forEach((v, i) => {
-                if (i === 0) {
+            distinct_values.forEach((v) => {
+                if (statistics.min_value === undefined) {
                     statistics.max_value = v;
                     statistics.min_value = v;
                 }
                 else {
                     const { min_value, max_value } = compareStatistics(v, statistics);
-                    if (min_value !== undefined)
+                    if (min_value !== undefined) {
                         statistics.min_value = min_value;
-                    if (max_value !== undefined)
+                    }
+                    if (max_value !== undefined) {
                         statistics.max_value = max_value;
+                    }
                 }
             });
             statistics.null_count = new node_int64_1.default(values.dlevels.length - values.values.length);
