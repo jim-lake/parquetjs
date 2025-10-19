@@ -232,4 +232,69 @@ describe('statistics', function () {
       assert.equal(column.column_index_length, null);
     });
   });
+
+  describe('UTF-8 string comparison edge cases', function () {
+    let reader2;
+
+    const utf8Schema = new parquet.ParquetSchema({
+      unicode_edge: { type: 'UTF8' },
+      emoji_sort: { type: 'UTF8' },
+    });
+
+    before(async function () {
+      let writer = await parquet.ParquetWriter.openFile(utf8Schema, path.join(os.tmpdir(), 'utf8-edge-cases.parquet'), {
+        pageSize: 3,
+      });
+
+      // UTF-8 edge cases where JS string comparison != Buffer comparison
+      // These strings have different sort orders in JS vs UTF-8 bytes
+      await writer.appendRow({
+        unicode_edge: 'A', // U+0041
+        emoji_sort: '🍎', // U+1F34E (apple)
+      });
+      await writer.appendRow({
+        unicode_edge: 'a', // U+0061 - JS: 'A' < 'a', but UTF-8 bytes: 0x41 < 0x61
+        emoji_sort: '🍌', // U+1F34C (banana)
+      });
+      await writer.appendRow({
+        unicode_edge: 'À', // U+00C0 - JS: 'a' < 'À', but UTF-8 bytes: 0xC380 vs 0x61
+        emoji_sort: '🥝', // U+1F95D (kiwi)
+      });
+      await writer.appendRow({
+        unicode_edge: 'ä', // U+00E4 - JS: 'À' < 'ä', but UTF-8 bytes: 0xC380 < 0xC3A4
+        emoji_sort: '🍊', // U+1F34A (orange)
+      });
+
+      await writer.close();
+      reader2 = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'utf8-edge-cases.parquet'));
+    });
+
+    after(async function () {
+      if (reader2) {
+        await reader2.close();
+      }
+    });
+
+    it('unicode_edge column statistics should use UTF-8 byte comparison', function () {
+      const column = reader2.metadata.row_groups[0].columns.find(
+        (c) => c.meta_data.path_in_schema.join(',') === 'unicode_edge'
+      );
+      const stats = column.meta_data.statistics;
+
+      // UTF-8 byte order: 'A' (0x41) < 'a' (0x61) < 'À' (0xC380) < 'ä' (0xC3A4)
+      assert.equal(stats.min.toString('utf8'), 'A');
+      assert.equal(stats.max.toString('utf8'), 'ä');
+    });
+
+    it('emoji_sort column statistics should sort emojis by UTF-8 bytes', function () {
+      const column = reader2.metadata.row_groups[0].columns.find(
+        (c) => c.meta_data.path_in_schema.join(',') === 'emoji_sort'
+      );
+      const stats = column.meta_data.statistics;
+
+      // UTF-8 byte order for emojis: 🍊 (U+1F34A) < 🍌 (U+1F34C) < 🍎 (U+1F34E) < 🥝 (U+1F95D)
+      assert.equal(stats.min.toString('utf8'), '🍊');
+      assert.equal(stats.max.toString('utf8'), '🥝');
+    });
+  });
 });
