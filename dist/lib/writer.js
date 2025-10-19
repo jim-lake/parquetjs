@@ -446,7 +446,7 @@ async function encodePages(schema, rowBuffer, opts) {
         let statistics = {};
         if (field.statistics !== false) {
             statistics = {};
-            distinct_values.forEach((v) => {
+            for (let v of distinct_values) {
                 if (statistics.min_value === undefined) {
                     statistics.max_value = v;
                     statistics.min_value = v;
@@ -460,7 +460,7 @@ async function encodePages(schema, rowBuffer, opts) {
                         statistics.max_value = max_value;
                     }
                 }
-            });
+            }
             statistics.null_count = new node_int64_1.default(values.dlevels.length - values.values.length);
             statistics.distinct_count = new node_int64_1.default(distinct_values.size);
         }
