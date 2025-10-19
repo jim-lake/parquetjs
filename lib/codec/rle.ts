@@ -4,7 +4,7 @@
 
 import varint from 'varint';
 import { Cursor } from './types';
-import { encodeValuesBigInt } from './rle_bigint';
+import { encodeValuesBigInt, decodeValuesBigInt } from './rle_bigint';
 
 function encodeRunBitpacked(values: number[], opts: { bitWidth: number }) {
   for (let i = 0; i < values.length % 8; i++) {
@@ -153,6 +153,11 @@ export const decodeValues = function (
     throw new Error('bitWidth is required');
   }
 
+  // Use BigInt decoder for INT64 types to handle large values correctly
+  if (type === 'INT64') {
+    return decodeValuesBigInt(type, cursor, count, opts);
+  }
+
   if (!opts.disableEnvelope) {
     cursor.offset += 4;
   }
@@ -177,11 +182,6 @@ export const decodeValues = function (
 
   if (values.length !== count) {
     throw new Error('invalid RLE encoding');
-  }
-
-  // Convert to bigints for INT64 type
-  if (type === 'INT64') {
-    values = values.map(v => BigInt(v));
   }
 
   return values;

@@ -1,5 +1,10 @@
 import varint from 'varint';
 
+interface Cursor {
+  buffer: Buffer;
+  offset: number;
+}
+
 function encodeRunBitpacked(values: bigint[], opts: { bitWidth: number }) {
   for (let i = 0; i < values.length % 8; i++) {
     values.push(0n);
@@ -36,6 +41,74 @@ function unknownToParsedBigInt(value: string | number | bigint): bigint {
     return value;
   }
 }
+
+function decodeRunBitpackedBigInt(cursor: Cursor, count: number, opts: { bitWidth: number }) {
+  if (count % 8 !== 0) {
+    throw new Error('must be a multiple of 8');
+  }
+
+  const values = new Array(count).fill(0n);
+  for (let b = 0; b < opts.bitWidth * count; ++b) {
+    if (cursor.buffer[cursor.offset + Math.floor(b / 8)] & (1 << b % 8)) {
+      values[Math.floor(b / opts.bitWidth)] |= 1n << BigInt(b % opts.bitWidth);
+    }
+  }
+
+  cursor.offset += Math.ceil(opts.bitWidth * (count / 8));
+  return values;
+}
+
+function decodeRunRepeatedBigInt(cursor: Cursor, count: number, opts: { bitWidth: number }) {
+  const bytesNeededForFixedBitWidth = Math.ceil(opts.bitWidth / 8);
+  let value = 0n;
+
+  for (let i = 0; i < bytesNeededForFixedBitWidth; ++i) {
+    const byte = cursor.buffer[cursor.offset];
+    value += BigInt(byte) << BigInt(i * 8);
+    cursor.offset += 1;
+  }
+
+  return new Array(count).fill(value);
+}
+
+export const decodeValuesBigInt = function (
+  type: string,
+  cursor: Cursor,
+  count: number,
+  opts: { bitWidth: number; disableEnvelope?: boolean }
+) {
+  if (!('bitWidth' in opts)) {
+    throw new Error('bitWidth is required');
+  }
+
+  if (!opts.disableEnvelope) {
+    cursor.offset += 4;
+  }
+
+  let values: bigint[] = [];
+  let res: bigint[];
+
+  while (values.length < count) {
+    const header = varint.decode(cursor.buffer, cursor.offset);
+    cursor.offset += varint.encodingLength(header);
+    if (header & 1) {
+      res = decodeRunBitpackedBigInt(cursor, (header >> 1) * 8, opts);
+    } else {
+      res = decodeRunRepeatedBigInt(cursor, header >> 1, opts);
+    }
+
+    for (let i = 0; i < res.length; i++) {
+      values.push(res[i]);
+    }
+  }
+  values = values.slice(0, count);
+
+  if (values.length !== count) {
+    throw new Error('invalid RLE encoding');
+  }
+
+  return values;
+};
 
 export const encodeValuesBigInt = function (
   type: string,

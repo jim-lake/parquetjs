@@ -8,6 +8,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.decodeValues = exports.encodeValues = void 0;
 const varint_1 = __importDefault(require("varint"));
+const rle_bigint_1 = require("./rle_bigint");
 function encodeRunBitpacked(values, opts) {
     for (let i = 0; i < values.length % 8; i++) {
         values.push(0);
@@ -35,6 +36,9 @@ function unknownToParsedInt(value) {
     if (typeof value === 'string') {
         return parseInt(value, 10);
     }
+    else if (typeof value === 'bigint') {
+        return Number(value);
+    }
     else {
         return value;
     }
@@ -42,6 +46,9 @@ function unknownToParsedInt(value) {
 const encodeValues = function (type, values, opts) {
     if (!('bitWidth' in opts)) {
         throw new Error('bitWidth is required');
+    }
+    if (opts.bitWidth > 32) {
+        return (0, rle_bigint_1.encodeValuesBigInt)(type, values, opts);
     }
     switch (type) {
         case 'BOOLEAN':
@@ -118,9 +125,13 @@ function decodeRunRepeated(cursor, count, opts) {
     }
     return new Array(count).fill(value);
 }
-const decodeValues = function (_, cursor, count, opts) {
+const decodeValues = function (type, cursor, count, opts) {
     if (!('bitWidth' in opts)) {
         throw new Error('bitWidth is required');
+    }
+    // Use BigInt decoder for INT64 types to handle large values correctly
+    if (type === 'INT64') {
+        return (0, rle_bigint_1.decodeValuesBigInt)(type, cursor, count, opts);
     }
     if (!opts.disableEnvelope) {
         cursor.offset += 4;

@@ -497,6 +497,9 @@ function toPrimitive_TIMESTAMP_MILLIS(value) {
     if (value instanceof Date) {
         return value.getTime();
     }
+    if (typeof value === 'bigint') {
+        return Number(value);
+    }
     return toNumberInternal('TIMESTAMP_MILLIS', value);
 }
 function fromPrimitive_TIMESTAMP_MILLIS(value) {
