@@ -251,35 +251,67 @@ function decodeValues_DOUBLE(cursor: Cursor, count: number) {
   return values;
 }
 
-function encodeValues_BYTE_ARRAY(values: Uint8Array[]) {
+const STR_PAD = 8;
+function encodeValues_BYTE_ARRAY(values: (Uint8Array | string)[]) {
   let buf_len = 0;
   for (let i = 0; i < values.length; i++) {
-    const value = values[i];
-    if (typeof value === 'string') {
-      buf_len += 4 + Buffer.byteLength(value, 'utf8');
-    } else {
-      buf_len += 4 + value.length;
-    }
+    const v = values[i];
+    buf_len += 4 + v.length + (typeof v === 'string' ? STR_PAD : 0);
   }
+
   const buf = Buffer.allocUnsafe(buf_len);
   let buf_pos = 0;
   for (let i = 0; i < values.length; i++) {
-    const value = values[i];
-    if (Buffer.isBuffer(value)) {
-      buf.writeUInt32LE(value.length, buf_pos);
-      value.copy(buf, buf_pos + 4);
-      buf_pos += 4 + value.length;
-    } else if (typeof value === 'string') {
-      const len = buf.write(value, buf_pos + 4, 'utf8');
+    const v = values[i];
+
+    if (typeof v === 'string') {
+      const len = buf.write(v, buf_pos + 4, 'utf8');
+      const end_pos = buf_pos + 4 + len;
+
+      if (end_pos >= buf_len) {
+        // slow finish
+        const begin_buf = buf.subarray(0, buf_pos);
+        let rest_len = 0;
+
+        for (let j = i; j < values.length; j++) {
+          const x = values[j];
+          rest_len += 4 + (typeof x === 'string' ? Buffer.byteLength(x, 'utf8') : x.length);
+        }
+
+        const rest_buf = Buffer.allocUnsafe(rest_len);
+        for (let j = i, rest_pos = 0; j < values.length; j++) {
+          const x = values[j];
+          if (typeof x === 'string') {
+            const l = rest_buf.write(x, rest_pos + 4, 'utf8');
+            rest_buf.writeUInt32LE(l, rest_pos);
+            rest_pos += 4 + l;
+          } else {
+            const l = x.length;
+            rest_buf.writeUInt32LE(l, rest_pos);
+            if (Buffer.isBuffer(x)) {
+              x.copy(rest_buf, rest_pos + 4);
+            } else {
+              rest_buf.set(x, rest_pos + 4);
+            }
+            rest_pos += 4 + l;
+          }
+        }
+        return Buffer.concat([begin_buf, rest_buf]);
+      }
+
       buf.writeUInt32LE(len, buf_pos);
-      buf_pos += 4 + len;
+      buf_pos = end_pos;
     } else {
-      buf.writeUInt32LE(buf_pos, value.length);
-      buf.set(value, buf_pos + 4);
-      buf_pos += 4 + value.length;
+      buf.writeUInt32LE(v.length, buf_pos);
+      if (Buffer.isBuffer(v)) {
+        v.copy(buf, buf_pos + 4);
+      } else {
+        buf.set(v, buf_pos + 4);
+      }
+      buf_pos += 4 + v.length;
     }
   }
-  return buf;
+  return buf_pos < buf.length ? buf.subarray(0, buf_pos) : buf;
 }
 
 function decodeValues_BYTE_ARRAY(cursor: Cursor, count: number) {
