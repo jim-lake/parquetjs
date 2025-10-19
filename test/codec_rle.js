@@ -141,6 +141,61 @@ describe('ParquetCodec::RLE', function () {
     );
   });
 
+  it('should encode/decode INT64 with 44-bit values', function () {
+    // Values with 44th bit set (2^43 = 8796093022208)
+    const inputs = [8796093022208, 8796093022209, 8796093022210, 8796093022211];
+    const expectedOutputs = [8796093022208n, 8796093022209n, 8796093022210n, 8796093022211n];
+
+    let buf = parquet_codec_rle.encodeValues('INT64', inputs, {
+      disableEnvelope: true,
+      bitWidth: 44,
+    });
+
+    assert.deepEqual(
+      buf,
+      Buffer.from([
+        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x80, 0x02, 0x00, 0x00, 0x00, 0x00, 0x38,
+        0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ])
+    );
+
+    let vals = parquet_codec_rle.decodeValues('INT64', { buffer: buf, offset: 0 }, 4, {
+      disableEnvelope: true,
+      bitWidth: 44,
+    });
+
+    assert.deepEqual(vals, expectedOutputs);
+  });
+
+  it('should encode/decode INT64 with 63-bit values', function () {
+    // Values using all 63 bits (2^62 = 4611686018427387904n)
+    const inputs = [4611686018427387904n, 4611686018427387905n, 4611686018427387906n, 4611686018427387907n];
+    const expectedOutputs = [4611686018427387904n, 4611686018427387905n, 4611686018427387906n, 4611686018427387907n];
+
+    let buf = parquet_codec_rle.encodeValues('INT64', inputs, {
+      disableEnvelope: true,
+      bitWidth: 63,
+    });
+
+    assert.deepEqual(
+      buf,
+      Buffer.from([
+        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa0, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ])
+    );
+
+    let vals = parquet_codec_rle.decodeValues('INT64', { buffer: buf, offset: 0 }, 4, {
+      disableEnvelope: true,
+      bitWidth: 63,
+    });
+
+    assert.deepEqual(vals, expectedOutputs);
+  });
+
   it('should write and read INT32 column with RLE encoding and produce smaller files', async function () {
     const fs = require('fs');
 

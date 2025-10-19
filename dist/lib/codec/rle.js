@@ -50,11 +50,12 @@ const encodeValues = function (type, values, opts) {
     if (opts.bitWidth > 32) {
         return (0, rle_bigint_1.encodeValuesBigInt)(type, values, opts);
     }
+    let numericValues;
     switch (type) {
         case 'BOOLEAN':
         case 'INT32':
         case 'INT64':
-            values = values.map((x) => unknownToParsedInt(x));
+            numericValues = values.map((x) => unknownToParsedInt(x));
             break;
         default:
             throw new Error('unsupported type: ' + type);
@@ -62,10 +63,10 @@ const encodeValues = function (type, values, opts) {
     let buf = Buffer.alloc(0);
     let run = [];
     let repeats = 0;
-    for (let i = 0; i < values.length; i++) {
+    for (let i = 0; i < numericValues.length; i++) {
         // If we are at the beginning of a run and the next value is same we start
         // collecting repeated values
-        if (repeats === 0 && run.length % 8 === 0 && values[i] === values[i + 1]) {
+        if (repeats === 0 && run.length % 8 === 0 && numericValues[i] === numericValues[i + 1]) {
             // If we have any data in runs we need to encode them
             if (run.length) {
                 buf = Buffer.concat([buf, encodeRunBitpacked(run, opts)]);
@@ -73,20 +74,20 @@ const encodeValues = function (type, values, opts) {
             }
             repeats = 1;
         }
-        else if (repeats > 0 && values[i] === values[i - 1]) {
+        else if (repeats > 0 && numericValues[i] === numericValues[i - 1]) {
             repeats += 1;
         }
         else {
             // If values changes we need to post any previous repeated values
             if (repeats) {
-                buf = Buffer.concat([buf, encodeRunRepeated(values[i - 1], repeats, opts)]);
+                buf = Buffer.concat([buf, encodeRunRepeated(numericValues[i - 1], repeats, opts)]);
                 repeats = 0;
             }
-            run.push(values[i]);
+            run.push(numericValues[i]);
         }
     }
     if (repeats) {
-        buf = Buffer.concat([buf, encodeRunRepeated(values[values.length - 1], repeats, opts)]);
+        buf = Buffer.concat([buf, encodeRunRepeated(numericValues[numericValues.length - 1], repeats, opts)]);
     }
     else if (run.length) {
         buf = Buffer.concat([buf, encodeRunBitpacked(run, opts)]);
