@@ -459,15 +459,23 @@ function toPrimitive_BYTE_ARRAY(value: number[]) {
 }
 
 function toPrimitive_UTF8(value: string) {
-  // Optimize for common case - if it's already a string, convert directly
+  // Return strings directly instead of converting to buffers
   if (typeof value === 'string') {
-    return Buffer.from(value, 'utf8');
+    return value;
   }
-  return Buffer.from(String(value), 'utf8');
+  return String(value);
 }
 
-function fromPrimitive_UTF8(value: string) {
-  return value !== undefined && value !== null ? value.toString() : value;
+function fromPrimitive_UTF8(value: string | Buffer | null | undefined) {
+  // Handle null and undefined values
+  if (value === null || value === undefined) {
+    return value;
+  }
+  // Handle buffer inputs for backward compatibility
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  return String(value);
 }
 
 function toPrimitive_JSON(value: object) {

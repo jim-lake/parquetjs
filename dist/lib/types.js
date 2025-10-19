@@ -424,14 +424,22 @@ function toPrimitive_BYTE_ARRAY(value) {
     return Buffer.from(value);
 }
 function toPrimitive_UTF8(value) {
-    // Optimize for common case - if it's already a string, convert directly
+    // Return strings directly instead of converting to buffers
     if (typeof value === 'string') {
-        return Buffer.from(value, 'utf8');
+        return value;
     }
-    return Buffer.from(String(value), 'utf8');
+    return String(value);
 }
 function fromPrimitive_UTF8(value) {
-    return value !== undefined && value !== null ? value.toString() : value;
+    // Handle null and undefined values
+    if (value === null || value === undefined) {
+        return value;
+    }
+    // Handle buffer inputs for backward compatibility
+    if (Buffer.isBuffer(value)) {
+        return value.toString('utf8');
+    }
+    return String(value);
 }
 function toPrimitive_JSON(value) {
     return Buffer.from(JSON.stringify(value));
@@ -467,7 +475,7 @@ function toPrimitive_TIME_MILLIS(value) {
     return toNumberInternal('TIME_MILLIS', value);
 }
 function toPrimitive_TIME_MICROS(value) {
-    const v = BigInt(value);
+    const v = typeof value === 'bigint' ? value : BigInt(value);
     if (v < 0n) {
         throw new Error('TIME_MICROS value is out of bounds: ' + value);
     }
@@ -495,13 +503,17 @@ function fromPrimitive_TIMESTAMP_MILLIS(value) {
     return new Date(Number(value));
 }
 function toPrimitive_TIMESTAMP_MICROS(value) {
-    /* convert from date */
+    if (typeof value === 'bigint') {
+        if (value < 0n) {
+            throw new Error('out of bounds');
+        }
+        return value;
+    }
     if (value instanceof Date) {
         return BigInt(value.getTime()) * 1000n;
     }
-    /* convert from integer */
     try {
-        // Will throw if NaN
+        // Will throw on lots of cases for strings/numbers
         const v = BigInt(value);
         if (v < 0n) {
             throw new Error('out of bounds');
