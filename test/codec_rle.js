@@ -1,7 +1,10 @@
 'use strict';
 const chai = require('chai');
+const os = require('os');
+const path = require('path');
 const assert = chai.assert;
 const parquet_codec_rle = require('../lib/codec/rle');
+const parquet = require('../parquet');
 
 describe('ParquetCodec::RLE', function () {
   it('should encode bitpacked values', function () {
@@ -116,5 +119,574 @@ describe('ParquetCodec::RLE', function () {
     );
 
     assert.deepEqual(vals, [0, 1, 2, 3, 4, 5, 6, 7, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('should write and read INT32 column with RLE encoding and produce smaller files', async function () {
+    const fs = require('fs');
+
+    const rleSchema = new parquet.ParquetSchema({
+      value: { type: 'INT32', encoding: 'RLE', typeLength: 7 },
+    });
+
+    const plainSchema = new parquet.ParquetSchema({
+      value: { type: 'INT32', encoding: 'PLAIN' },
+    });
+
+    const rleFile = path.join(os.tmpdir(), 'test-rle-int32.parquet');
+    const plainFile = path.join(os.tmpdir(), 'test-plain-int32.parquet');
+
+    // Create test data with many repeated values for RLE compression
+    const testData = Array(100)
+      .fill()
+      .map((_, i) => Math.floor(i / 10));
+
+    // Write with RLE encoding
+    const rleWriter = await parquet.ParquetWriter.openFile(rleSchema, rleFile);
+    for (const value of testData) {
+      await rleWriter.appendRow({ value });
+    }
+    await rleWriter.close();
+
+    // Write with PLAIN encoding
+    const plainWriter = await parquet.ParquetWriter.openFile(plainSchema, plainFile);
+    for (const value of testData) {
+      await plainWriter.appendRow({ value });
+    }
+    await plainWriter.close();
+
+    // Verify RLE file is smaller
+    const rleSize = fs.statSync(rleFile).size;
+    const plainSize = fs.statSync(plainFile).size;
+    assert.isTrue(rleSize < plainSize, `RLE file (${rleSize}) should be smaller than PLAIN file (${plainSize})`);
+
+    // Verify data integrity
+    const reader = await parquet.ParquetReader.openFile(rleFile);
+    const cursor = reader.getCursor();
+    const results = [];
+    let record;
+    while ((record = await cursor.next())) {
+      results.push(record.value);
+    }
+    await reader.close();
+
+    assert.deepEqual(results, testData);
+  });
+
+  it('should work with multiple RLE columns of different types', async function () {
+    const schema = new parquet.ParquetSchema({
+      bool_col: { type: 'BOOLEAN', encoding: 'RLE', typeLength: 1 },
+      int32_col: { type: 'INT32', encoding: 'RLE', typeLength: 7 },
+      int8_col: { type: 'INT_8', encoding: 'RLE', typeLength: 7 },
+      int16_col: { type: 'INT_16', encoding: 'RLE', typeLength: 7 },
+      int32_typed_col: { type: 'INT_32', encoding: 'RLE', typeLength: 7 },
+      uint8_col: { type: 'UINT_8', encoding: 'RLE', typeLength: 7 },
+      uint16_col: { type: 'UINT_16', encoding: 'RLE', typeLength: 7 },
+      uint32_col: { type: 'UINT_32', encoding: 'RLE', typeLength: 7 },
+      // TIME_MILLIS has value transformation issues
+      // time_millis_col: { type: 'TIME_MILLIS', encoding: 'RLE', typeLength: 7 },
+      // Types that don't work with RLE due to BigInt issues:
+      // int64_col: { type: 'INT64', encoding: 'RLE', typeLength: 7 },
+      // time_micros_col: { type: 'TIME_MICROS', encoding: 'RLE', typeLength: 7 },
+      // timestamp_millis_col: { type: 'TIMESTAMP_MILLIS', encoding: 'RLE', typeLength: 7 },
+      // timestamp_micros_col: { type: 'TIMESTAMP_MICROS', encoding: 'RLE', typeLength: 7 },
+      // int64_typed_col: { type: 'INT_64', encoding: 'RLE', typeLength: 7 },
+      // uint64_col: { type: 'UINT_64', encoding: 'RLE', typeLength: 7 },
+    });
+
+    const testFile = path.join(os.tmpdir(), 'test-multi-rle.parquet');
+    const testData = Array(50)
+      .fill()
+      .map((_, i) => ({
+        bool_col: i % 2 === 0,
+        int32_col: Math.floor(i / 5),
+        int8_col: Math.floor(i / 5) % 100,
+        int16_col: Math.floor(i / 5),
+        int32_typed_col: Math.floor(i / 5),
+        uint8_col: Math.floor(i / 5) % 200,
+        uint16_col: Math.floor(i / 5),
+        uint32_col: Math.floor(i / 5),
+      }));
+
+    const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+    for (const row of testData) {
+      await writer.appendRow(row);
+    }
+    await writer.close();
+
+    const reader = await parquet.ParquetReader.openFile(testFile);
+    const cursor = reader.getCursor();
+    const results = [];
+    let record;
+    while ((record = await cursor.next())) {
+      results.push(record);
+    }
+    await reader.close();
+
+    assert.deepEqual(results, testData);
+  });
+
+  describe('RLE encoding by type', function () {
+    const testData = Array(20)
+      .fill()
+      .map((_, i) => Math.floor(i / 4));
+
+    it('should work with BOOLEAN type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'BOOLEAN', encoding: 'RLE', typeLength: 1 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-boolean-rle.parquet');
+      const boolData = Array(20)
+        .fill()
+        .map((_, i) => i % 2 === 0);
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of boolData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, boolData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('BOOLEAN RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT32 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT32', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int32-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT32 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT64 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT64', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int64-rle.parquet');
+      const bigIntData = testData.map((v) => BigInt(v));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of bigIntData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, bigIntData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT64 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with TIME_MILLIS type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'TIME_MILLIS', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-time-millis-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('TIME_MILLIS RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with TIME_MICROS type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'TIME_MICROS', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-time-micros-rle.parquet');
+      const bigIntData = testData.map((v) => BigInt(v));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of bigIntData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, bigIntData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('TIME_MICROS RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with TIMESTAMP_MILLIS type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'TIMESTAMP_MILLIS', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-timestamp-millis-rle.parquet');
+      const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of timestampData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, timestampData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('TIMESTAMP_MILLIS RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with TIMESTAMP_MICROS type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'TIMESTAMP_MICROS', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-timestamp-micros-rle.parquet');
+      const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of timestampData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, timestampData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('TIMESTAMP_MICROS RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT_8 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT_8', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int8-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT_8 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT_16 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT_16', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int16-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT_16 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT_32 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT_32', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int32-typed-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT_32 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT_64 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT_64', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int64-typed-rle.parquet');
+      const bigIntData = testData.map((v) => BigInt(v));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of bigIntData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, bigIntData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT_64 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with UINT_8 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'UINT_8', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-uint8-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('UINT_8 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with UINT_16 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'UINT_16', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-uint16-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('UINT_16 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with UINT_32 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'UINT_32', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-uint32-rle.parquet');
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('UINT_32 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with UINT_64 type', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'UINT_64', encoding: 'RLE', typeLength: 7 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-uint64-rle.parquet');
+      const bigIntData = testData.map((v) => BigInt(v));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of bigIntData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, bigIntData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('UINT_64 RLE failed:', err.message);
+        throw err;
+      });
+    });
   });
 });
