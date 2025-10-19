@@ -510,9 +510,6 @@ async function encodePages(
     if (field.statistics !== false) {
       statistics = {};
       for (let v of distinct_values) {
-        if (field.originalType === 'UTF8' && typeof v === 'string') {
-          v = Buffer.from(v, 'utf8');
-        }
         if (statistics.min_value === undefined) {
           statistics.max_value = v as Buffer;
           statistics.min_value = v as Buffer;
