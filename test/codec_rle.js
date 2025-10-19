@@ -295,7 +295,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with INT64 type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'INT64', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'INT64', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-int64-rle.parquet');
       const bigIntData = testData.map((v) => BigInt(v));
@@ -326,7 +326,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with TIME_MILLIS type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'TIME_MILLIS', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'TIME_MILLIS', encoding: 'RLE', typeLength: 27 },
       });
       const testFile = path.join(os.tmpdir(), 'test-time-millis-rle.parquet');
 
@@ -356,7 +356,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with TIME_MICROS type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'TIME_MICROS', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'TIME_MICROS', encoding: 'RLE', typeLength: 37 },
       });
       const testFile = path.join(os.tmpdir(), 'test-time-micros-rle.parquet');
       const bigIntData = testData.map((v) => BigInt(v));
@@ -387,7 +387,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with TIMESTAMP_MILLIS type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'TIMESTAMP_MILLIS', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'TIMESTAMP_MILLIS', encoding: 'RLE', typeLength: 45 },
       });
       const testFile = path.join(os.tmpdir(), 'test-timestamp-millis-rle.parquet');
       const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
@@ -418,7 +418,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with TIMESTAMP_MICROS type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'TIMESTAMP_MICROS', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'TIMESTAMP_MICROS', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-timestamp-micros-rle.parquet');
       const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
@@ -539,7 +539,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with INT_64 type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'INT_64', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'INT_64', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-int64-typed-rle.parquet');
       const bigIntData = testData.map((v) => BigInt(v));
@@ -660,7 +660,7 @@ describe('ParquetCodec::RLE', function () {
 
     it('should work with UINT_64 type', async function () {
       const schema = new parquet.ParquetSchema({
-        value: { type: 'UINT_64', encoding: 'RLE', typeLength: 7 },
+        value: { type: 'UINT_64', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-uint64-rle.parquet');
       const bigIntData = testData.map((v) => BigInt(v));
