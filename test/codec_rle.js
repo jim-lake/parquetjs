@@ -450,7 +450,7 @@ describe('ParquetCodec::RLE', function () {
         value: { type: 'TIMESTAMP_MILLIS', encoding: 'RLE', typeLength: 45 },
       });
       const testFile = path.join(os.tmpdir(), 'test-timestamp-millis-rle.parquet');
-      const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
+      const timestampData = testData.map((v) => new Date(Date.now() + v * 1000));
 
       const testFunction = async () => {
         const writer = await parquet.ParquetWriter.openFile(schema, testFile);
@@ -481,7 +481,7 @@ describe('ParquetCodec::RLE', function () {
         value: { type: 'TIMESTAMP_MICROS', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-timestamp-micros-rle.parquet');
-      const timestampData = testData.map((v) => BigInt(Date.now() + v * 1000));
+      const timestampData = testData.map((v) => new Date(Date.now() + v * 1000));
 
       const testFunction = async () => {
         const writer = await parquet.ParquetWriter.openFile(schema, testFile);
