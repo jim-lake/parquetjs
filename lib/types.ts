@@ -539,10 +539,13 @@ function fromPrimitive_DATE(value: number) {
   return new Date(+value * kMillisPerDay);
 }
 
-function toPrimitive_TIMESTAMP_MILLIS(value: string | Date | number) {
+function toPrimitive_TIMESTAMP_MILLIS(value: string | Date | number | bigint) {
   /* convert from date */
   if (value instanceof Date) {
     return value.getTime();
+  }
+  if (typeof value === 'bigint') {
+    return Number(value);
   }
   return toNumberInternal('TIMESTAMP_MILLIS', value);
 }

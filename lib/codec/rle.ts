@@ -34,9 +34,11 @@ function encodeRunRepeated(value: number, count: number, opts: { bitWidth: numbe
   return Buffer.concat([Buffer.from(varint.encode(count << 1)), buf]);
 }
 
-function unknownToParsedInt(value: string | number) {
+function unknownToParsedInt(value: string | number | bigint) {
   if (typeof value === 'string') {
     return parseInt(value, 10);
+  } else if (typeof value === 'bigint') {
+    return Number(value);
   } else {
     return value;
   }
@@ -44,11 +46,15 @@ function unknownToParsedInt(value: string | number) {
 
 export const encodeValues = function (
   type: string,
-  values: number[],
+  values: (number | bigint)[],
   opts: { bitWidth: number; disableEnvelope?: boolean }
 ) {
   if (!('bitWidth' in opts)) {
     throw new Error('bitWidth is required');
+  }
+
+  if (opts.bitWidth > 32) {
+    throw new Error('typeLength cannot be greater than 32');
   }
 
   switch (type) {
@@ -137,7 +143,7 @@ function decodeRunRepeated(cursor: Cursor, count: number, opts: { bitWidth: numb
 }
 
 export const decodeValues = function (
-  _: string,
+  type: string,
   cursor: Cursor,
   count: number,
   opts: { bitWidth: number; disableEnvelope?: boolean }
@@ -170,6 +176,11 @@ export const decodeValues = function (
 
   if (values.length !== count) {
     throw new Error('invalid RLE encoding');
+  }
+
+  // Convert to bigints for INT64 type
+  if (type === 'INT64') {
+    values = values.map(v => BigInt(v));
   }
 
   return values;
