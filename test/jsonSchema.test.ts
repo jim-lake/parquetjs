@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { assert, expect } from 'chai';
 import { JSONSchema4 } from 'json-schema';
@@ -242,7 +243,7 @@ describe('Json Schema Conversion Test File', function () {
   let reader: ParquetReader;
 
   before(async function () {
-    const filename = 'json-schema-test-file.parquet';
+    const filename = path.join(os.tmpdir(), 'json-schema-test-file.parquet');
     const writer = await ParquetWriter.openFile(parquetSchema, filename);
     await writer.appendRow(row1);
     await writer.close();

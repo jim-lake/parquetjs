@@ -3,12 +3,14 @@ const fs = require('fs');
 const fsPromises = require('fs/promises');
 const util = require('util');
 const path = require('path');
+const os = require('os');
 const readPromsify = util.promisify(fs.read);
 
 const rangeHandle = http.get('http://fruits-bloomfilter.parquet', async ({ request }) => {
-  const fd = fs.openSync(path.resolve(__dirname, '../../fruits-bloomfilter.parquet'), 'r');
+  const filePath = path.join(os.tmpdir(), 'fruits-bloomfilter.parquet');
+  const fd = fs.openSync(filePath, 'r');
 
-  const { size: fileSize } = await fsPromises.stat(path.resolve(__dirname, '../../fruits-bloomfilter.parquet'));
+  const { size: fileSize } = await fsPromises.stat(filePath);
 
   const rangeHeader = request.headers.get('range');
   if (!rangeHeader) {

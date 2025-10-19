@@ -1,4 +1,6 @@
 import { expect } from 'chai';
+import * as os from 'os';
+import * as path from 'path';
 import { ParquetSchema } from '../lib/schema';
 import { ParquetWriter } from '../lib/writer';
 import { ParquetReader } from '../lib/reader';
@@ -9,7 +11,7 @@ describe('Metadata MinMax', function () {
       const decimalSchema = new ParquetSchema({
         rank: { type: 'DECIMAL' as const, precision: 20 },
       });
-      const testFile = 'min-max-decimal.parquet';
+      const testFile = path.join(os.tmpdir(), 'min-max-decimal.parquet');
       const writer = await ParquetWriter.openFile(decimalSchema, testFile);
 
       // These are the numbers for 10^15 + 127 through 10^15 + 129
@@ -35,7 +37,7 @@ describe('Metadata MinMax', function () {
       const intSchema = new ParquetSchema({
         rank: { type: 'INT64' },
       });
-      const testFile = 'min-max-int.parquet';
+      const testFile = path.join(os.tmpdir(), 'min-max-int.parquet');
       const writer = await ParquetWriter.openFile(intSchema, testFile);
 
       const min = 100n;
@@ -60,7 +62,7 @@ describe('Metadata MinMax', function () {
       const intSchema = new ParquetSchema({
         rank: { type: 'UTF8' },
       });
-      const testFile = 'min-max-int.parquet';
+      const testFile = path.join(os.tmpdir(), 'min-max-string.parquet');
       const writer = await ParquetWriter.openFile(intSchema, testFile);
 
       const min = 'A';
@@ -85,7 +87,7 @@ describe('Metadata MinMax', function () {
       const intSchema = new ParquetSchema({
         rank: { type: 'TIMESTAMP_MICROS' },
       });
-      const testFile = 'min-max-int.parquet';
+      const testFile = path.join(os.tmpdir(), 'min-max-timestamp.parquet');
       const writer = await ParquetWriter.openFile(intSchema, testFile);
 
       const min = 33_000;

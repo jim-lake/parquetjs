@@ -1,5 +1,7 @@
 'use strict';
 const chai = require('chai');
+const os = require('os');
+const path = require('path');
 const assert = chai.assert;
 const parquet = require('../parquet');
 
@@ -90,13 +92,15 @@ describe('struct list', function () {
   };
 
   before(async function () {
-    let writer = await parquet.ParquetWriter.openFile(listStructSchema, 'list.parquet', { pageSize: 100 });
+    let writer = await parquet.ParquetWriter.openFile(listStructSchema, path.join(os.tmpdir(), 'list.parquet'), {
+      pageSize: 100,
+    });
 
     writer.appendRow(row1);
     writer.appendRow(row2);
 
     await writer.close();
-    reader = await parquet.ParquetReader.openFile('list.parquet');
+    reader = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'list.parquet'));
   });
 
   it('schema is encoded correctly', async function () {
@@ -129,13 +133,15 @@ describe('array list', function () {
   };
 
   before(async function () {
-    let writer = await parquet.ParquetWriter.openFile(listArraySchema, 'list-array.parquet', { pageSize: 100 });
+    let writer = await parquet.ParquetWriter.openFile(listArraySchema, path.join(os.tmpdir(), 'list-array.parquet'), {
+      pageSize: 100,
+    });
 
     writer.appendRow(row1);
     writer.appendRow(row2);
 
     await writer.close();
-    reader = await parquet.ParquetReader.openFile('list-array.parquet');
+    reader = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'list-array.parquet'));
   });
 
   it('schema is encoded correctly', async function () {

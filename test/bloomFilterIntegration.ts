@@ -1,10 +1,12 @@
 import { assert } from 'chai';
+import * as os from 'os';
+import * as path from 'path';
 import parquet from '../parquet';
 import SplitBlockBloomFilter from '../lib/bloom/sbbf';
 
 const TEST_VTIME = new Date();
 
-const TEST_FILE = 'fruits-bloomfilter.parquet';
+const TEST_FILE = path.join(os.tmpdir(), 'fruits-bloomfilter.parquet');
 
 interface BloomFilterColumnData {
   sbbf: SplitBlockBloomFilter;
@@ -168,7 +170,7 @@ describe('bloom filter', function () {
     });
 
     it('can be written, read and checked', async function () {
-      const file = '/tmp/issue-98.parquet';
+      const file = path.join(os.tmpdir(), 'issue-98.parquet');
       const nestedListFilterColumn = 'querystring,list,element,key';
       const writer = await parquet.ParquetWriter.openFile(nestedListSchema, file, {
         bloomFilters: [{ column: 'name' }, { column: nestedListFilterColumn }],

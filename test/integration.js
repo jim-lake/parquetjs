@@ -4,6 +4,8 @@
 
 const chai = require('chai');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const assert = chai.assert;
 const parquet = require('../parquet');
 const parquet_thrift = require('../gen-nodejs/parquet_types');
@@ -104,7 +106,7 @@ function mkTestRows(_opts) {
 async function writeTestFile(opts) {
   let schema = mkTestSchema(opts);
 
-  let writer = await parquet.ParquetWriter.openFile(schema, 'fruits.parquet', opts);
+  let writer = await parquet.ParquetWriter.openFile(schema, path.join(os.tmpdir(), 'fruits.parquet'), opts);
   writer.setMetadata('myuid', '420');
   writer.setMetadata('fnord', 'dronf');
 
@@ -138,7 +140,7 @@ async function writeTestStream(opts) {
 }
 
 async function sampleColumnHeaders() {
-  let reader = await parquet.ParquetReader.openFile('fruits.parquet');
+  let reader = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'fruits.parquet'));
   let column = reader.metadata.row_groups[0].columns[0];
   let buffer = await reader.envelopeReader.read(
     +column.meta_data.data_page_offset,
@@ -208,7 +210,7 @@ async function verifyStatistics() {
 }
 
 async function readTestFile() {
-  let reader = await parquet.ParquetReader.openFile('fruits.parquet');
+  let reader = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'fruits.parquet'));
   assert.equal(reader.getRowCount(), TEST_NUM_ROWS * 4);
   assert.deepEqual(reader.getMetadata(), { myuid: '420', fnord: 'dronf' });
 
@@ -497,14 +499,14 @@ describe('Parquet', function () {
       const schema = new parquet.ParquetSchema({
         data: { type: 'BYTE_ARRAY', compression: opts.compression },
       });
-      let writer = await parquet.ParquetWriter.openFile(schema, 'fruits.parquet', opts);
+      let writer = await parquet.ParquetWriter.openFile(schema, path.join(os.tmpdir(), 'fruits.parquet'), opts);
       writer.setMetadata('myuid', '420');
       writer.setMetadata('fnord', 'dronf');
 
       await writer.appendRow({ data: Uint8Array.from([12345, 365]) });
       await writer.close();
 
-      let reader = await parquet.ParquetReader.openFile('fruits.parquet');
+      let reader = await parquet.ParquetReader.openFile(path.join(os.tmpdir(), 'fruits.parquet'));
       assert.equal(reader.getRowCount(), 1);
       assert.deepEqual(reader.getMetadata(), { myuid: '420', fnord: 'dronf' });
 
@@ -531,7 +533,7 @@ describe('Parquet', function () {
         const schema = new parquet.ParquetSchema({
           data: { type: 'BYTE_ARRAY', compression: opts.compression },
         });
-        let writer = await parquet.ParquetWriter.openFile(schema, 'fruits.parquet', opts);
+        let writer = await parquet.ParquetWriter.openFile(schema, path.join(os.tmpdir(), 'fruits.parquet'), opts);
         let gotError = false;
         try {
           await writer.appendRow(row);
@@ -553,7 +555,7 @@ describe('Parquet', function () {
       transform.writer.setMetadata('myuid', '420');
       transform.writer.setMetadata('fnord', 'dronf');
 
-      var ostream = fs.createWriteStream('fruits_stream.parquet');
+      var ostream = fs.createWriteStream(path.join(os.tmpdir(), 'fruits_stream.parquet'));
       let istream = objectStream.fromArray(mkTestRows());
       istream.pipe(transform).pipe(ostream);
     });
@@ -565,7 +567,7 @@ describe('Parquet', function () {
       transform.writer.setMetadata('myuid', '420');
       transform.writer.setMetadata('fnord', 'dronf');
 
-      var ostream = fs.createWriteStream('fruits_stream.parquet');
+      var ostream = fs.createWriteStream(path.join(os.tmpdir(), 'fruits_stream.parquet'));
       let testRows = mkTestRows();
       testRows[4].quantity = 'N/A';
       let istream = objectStream.fromArray(testRows);
@@ -601,7 +603,7 @@ describe('Parquet', function () {
     };
 
     it('write a test file with decimals in v1 data page and read it back', async function () {
-      const file = 'decimal-test-v1.parquet';
+      const file = path.join(os.tmpdir(), 'decimal-test-v1.parquet');
       const opts = { useDataPageV2: false };
       const writer = await parquet.ParquetWriter.openFile(schema, file, opts);
 
@@ -623,7 +625,7 @@ describe('Parquet', function () {
     });
 
     it('write a test file with decimals in v2 data page and read it back', async function () {
-      const file = 'decimal-test-v2.parquet';
+      const file = path.join(os.tmpdir(), 'decimal-test-v2.parquet');
       const opts = { useDataPageV2: true };
       const writer = await parquet.ParquetWriter.openFile(schema, file, opts);
 
