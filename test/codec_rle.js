@@ -358,7 +358,7 @@ describe('ParquetCodec::RLE', function () {
         value: { type: 'INT64', encoding: 'RLE', typeLength: 55 },
       });
       const testFile = path.join(os.tmpdir(), 'test-int64-rle-55bit.parquet');
-      const bigIntData = testData.map((v) => BigInt(v));
+      const bigIntData = testData.map((v) => BigInt(v) + 2n**35n);
 
       const testFunction = async () => {
         const writer = await parquet.ParquetWriter.openFile(schema, testFile);
