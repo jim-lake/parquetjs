@@ -292,12 +292,72 @@ describe('ParquetCodec::RLE', function () {
         throw err;
       });
     });
+    it('should work with INT32 type, 32 bits used', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT32', encoding: 'RLE', typeLength: 32 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int32-rle-32bit.parquet');
 
-    it('should work with INT64 type', async function () {
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of testData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, testData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT32 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT64 type, less than 32 bits used', async function () {
+      const schema = new parquet.ParquetSchema({
+        value: { type: 'INT64', encoding: 'RLE', typeLength: 32 },
+      });
+      const testFile = path.join(os.tmpdir(), 'test-int64-rle-32bit.parquet');
+      const bigIntData = testData.map((v) => BigInt(v));
+
+      const testFunction = async () => {
+        const writer = await parquet.ParquetWriter.openFile(schema, testFile);
+        for (const value of bigIntData) {
+          await writer.appendRow({ value });
+        }
+        await writer.close();
+
+        const reader = await parquet.ParquetReader.openFile(testFile);
+        const cursor = reader.getCursor();
+        const results = [];
+        let record;
+        while ((record = await cursor.next())) {
+          results.push(record.value);
+        }
+        await reader.close();
+        assert.deepEqual(results, bigIntData);
+      };
+
+      await testFunction().catch((err) => {
+        console.log('INT64 RLE failed:', err.message);
+        throw err;
+      });
+    });
+
+    it('should work with INT64 type, 55 bits used', async function () {
       const schema = new parquet.ParquetSchema({
         value: { type: 'INT64', encoding: 'RLE', typeLength: 55 },
       });
-      const testFile = path.join(os.tmpdir(), 'test-int64-rle.parquet');
+      const testFile = path.join(os.tmpdir(), 'test-int64-rle-55bit.parquet');
       const bigIntData = testData.map((v) => BigInt(v));
 
       const testFunction = async () => {
