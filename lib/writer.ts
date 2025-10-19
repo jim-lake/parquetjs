@@ -509,7 +509,7 @@ async function encodePages(
     let statistics: parquet_thrift.Statistics = {};
     if (field.statistics !== false) {
       statistics = {};
-      distinct_values.forEach((v: any) => {
+      for (const v of distinct_values) {
         if (statistics.min_value === undefined) {
           statistics.max_value = v as Buffer;
           statistics.min_value = v as Buffer;
@@ -522,7 +522,7 @@ async function encodePages(
             statistics.max_value = max_value as Buffer;
           }
         }
-      });
+      }
 
       statistics.null_count = new Int64(values.dlevels!.length - values.values!.length);
       statistics.distinct_count = new Int64(distinct_values.size);
