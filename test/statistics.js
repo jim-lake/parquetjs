@@ -144,6 +144,135 @@ describe('statistics', function () {
     assert.equal(rowStats('meta_json'), null);
   });
 
+  it('envelopeWriter statistics should match input', async function () {
+    const tempFile = path.join(os.tmpdir(), 'fruits-envelope-stats.parquet');
+    let writer = await parquet.ParquetWriter.openFile(schema, tempFile, {
+      pageSize: 3,
+    });
+
+    await writer.appendRow({
+      name: 'apples',
+      quantity: 10n,
+      price: 2.6,
+      day: new Date('2017-11-26'),
+      date: new Date(TEST_VTIME + 1000),
+      finger: 'FNORD',
+      inter: { months: 10, days: 5, milliseconds: 777 },
+      stock: [
+        { quantity: 10n, warehouse: 'A' },
+        { quantity: 20n, warehouse: 'B' },
+      ],
+      colour: ['green', 'red'],
+    });
+
+    await writer.appendRow({
+      name: 'oranges',
+      quantity: 20n,
+      price: 2.7,
+      day: new Date('2018-03-03'),
+      date: new Date(TEST_VTIME + 2000),
+      finger: 'ABCDE',
+      inter: { months: 42, days: 23, milliseconds: 777 },
+      stock: {
+        quantity: [50n, 33n, 34n, 35n, 36n],
+        warehouse: 'X',
+      },
+      colour: ['orange'],
+    });
+
+    await writer.appendRow({
+      name: 'kiwi',
+      price: 4.2,
+      quantity: 15n,
+      day: new Date('2008-11-26'),
+      date: new Date(TEST_VTIME + 8000),
+      finger: 'XCVBN',
+      inter: { months: 60, days: 1, milliseconds: 99 },
+      stock: [
+        { quantity: 42n, warehouse: 'f' },
+        { quantity: 21n, warehouse: 'x' },
+      ],
+      colour: ['green', 'brown', 'yellow'],
+      meta_json: { expected_ship_date: TEST_VTIME },
+    });
+
+    await writer.appendRow({
+      name: 'banana',
+      price: 3.2,
+      day: new Date('2017-11-26'),
+      date: new Date(TEST_VTIME + 6000),
+      finger: 'FNORD',
+      inter: { months: 1, days: 15, milliseconds: 888 },
+      colour: ['yellow'],
+      meta_json: { shape: 'curved' },
+    });
+
+    await writer.close();
+
+    // Get statistics from envelopeWriter and verify they match the reader's decoded values
+    const envelopeRow = writer.envelopeWriter.rowGroups[0];
+
+    // Open the same file with reader to get decoded statistics for comparison
+    const tempReader = await parquet.ParquetReader.openFile(tempFile);
+    const readerRow = tempReader.metadata.row_groups[0];
+    await tempReader.close();
+
+    const envelopeStats = (path) =>
+      envelopeRow.columns.find((d) => d.meta_data.path_in_schema.join(',') == path).meta_data.statistics;
+    const readerStats = (path) =>
+      readerRow.columns.find((d) => d.meta_data.path_in_schema.join(',') == path).meta_data.statistics;
+
+    // Verify that envelopeWriter statistics match reader statistics
+    assert.equal(envelopeStats('name').min_value.toString(), readerStats('name').min_value);
+    assert.equal(envelopeStats('name').max_value.toString(), readerStats('name').max_value);
+    assert.equal(+envelopeStats('name').distinct_count, +readerStats('name').distinct_count);
+    assert.equal(+envelopeStats('name').null_count, +readerStats('name').null_count);
+
+    assert.equal(envelopeStats('quantity').min_value.readBigInt64LE(0), readerStats('quantity').min_value);
+    assert.equal(envelopeStats('quantity').max_value.readBigInt64LE(0), readerStats('quantity').max_value);
+    assert.equal(+envelopeStats('quantity').distinct_count, +readerStats('quantity').distinct_count);
+    assert.equal(+envelopeStats('quantity').null_count, +readerStats('quantity').null_count);
+
+    assert.equal(envelopeStats('price').min_value.readDoubleLE(0), readerStats('price').min_value);
+    assert.equal(envelopeStats('price').max_value.readDoubleLE(0), readerStats('price').max_value);
+    assert.equal(+envelopeStats('price').distinct_count, +readerStats('price').distinct_count);
+    assert.equal(+envelopeStats('price').null_count, +readerStats('price').null_count);
+
+    assert.deepEqual(new Date(envelopeStats('day').min_value.readInt32LE(0) * 86400000), readerStats('day').min_value);
+    assert.deepEqual(new Date(envelopeStats('day').max_value.readInt32LE(0) * 86400000), readerStats('day').max_value);
+    assert.equal(+envelopeStats('day').distinct_count, +readerStats('day').distinct_count);
+    assert.equal(+envelopeStats('day').null_count, +readerStats('day').null_count);
+
+    assert.deepEqual(envelopeStats('finger').min_value, readerStats('finger').min_value);
+    assert.deepEqual(envelopeStats('finger').max_value, readerStats('finger').max_value);
+    assert.equal(+envelopeStats('finger').distinct_count, +readerStats('finger').distinct_count);
+    assert.equal(+envelopeStats('finger').null_count, +readerStats('finger').null_count);
+
+    assert.deepEqual(
+      envelopeStats('stock,quantity').min_value.readBigInt64LE(0),
+      readerStats('stock,quantity').min_value
+    );
+    assert.deepEqual(
+      envelopeStats('stock,quantity').max_value.readBigInt64LE(0),
+      readerStats('stock,quantity').max_value
+    );
+    assert.equal(+envelopeStats('stock,quantity').distinct_count, +readerStats('stock,quantity').distinct_count);
+    assert.equal(+envelopeStats('stock,quantity').null_count, +readerStats('stock,quantity').null_count);
+
+    assert.deepEqual(envelopeStats('stock,warehouse').min_value.toString(), readerStats('stock,warehouse').min_value);
+    assert.deepEqual(envelopeStats('stock,warehouse').max_value.toString(), readerStats('stock,warehouse').max_value);
+    assert.equal(+envelopeStats('stock,warehouse').distinct_count, +readerStats('stock,warehouse').distinct_count);
+    assert.equal(+envelopeStats('stock,warehouse').null_count, +readerStats('stock,warehouse').null_count);
+
+    assert.deepEqual(envelopeStats('colour').min_value.toString(), readerStats('colour').min_value);
+    assert.deepEqual(envelopeStats('colour').max_value.toString(), readerStats('colour').max_value);
+    assert.equal(+envelopeStats('colour').distinct_count, +readerStats('colour').distinct_count);
+    assert.equal(+envelopeStats('colour').null_count, +readerStats('colour').null_count);
+
+    assert.equal(envelopeStats('inter'), null);
+    assert.equal(envelopeStats('meta_json'), null);
+  });
+
   it('columnIndex statistics should match input', async function () {
     /*  we split the data into pages by 3, so we should have page 1 with 3 recs and page 2 with 1 */
 
