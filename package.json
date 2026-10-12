@@ -3,7 +3,7 @@
   "description": "fully asynchronous, pure JavaScript implementation of the Parquet file format",
   "main": "dist/parquet.js",
   "types": "dist/parquet.d.ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "homepage": "https://github.com/jim-lake/parquetjs",
   "license": "MIT",
   "keywords": [

@@ -1,4 +1,5 @@
 import parquet_thrift, { LogicalType } from '../gen-nodejs/parquet_types';
+import type * as parquet_thrift_t from '../gen-nodejs/parquet_types';
 import { Statistics, OffsetIndex, ColumnIndex, PageType, DataPageHeader, DataPageHeaderV2, DictionaryPageHeader, IndexPageHeader } from '../gen-nodejs/parquet_types';
 import SplitBlockBloomFilter from './bloom/sbbf';
 import { createSBBFParams } from './bloomFilterIO/bloomFilterWriter';
@@ -60,18 +61,18 @@ export interface ParquetBuffer {
 export type ParquetRecord = Record<string, any>;
 export interface ColumnChunkData {
     rowGroupIndex: number;
-    column: parquet_thrift.ColumnChunk;
+    column: parquet_thrift_t.ColumnChunk;
 }
-export interface ColumnChunkExt extends parquet_thrift.ColumnChunk {
+export interface ColumnChunkExt extends parquet_thrift_t.ColumnChunk {
     meta_data?: ColumnMetaDataExt;
     columnIndex?: ColumnIndex | Promise<ColumnIndex>;
     offsetIndex?: OffsetIndex | Promise<OffsetIndex>;
 }
-export interface ColumnMetaDataExt extends parquet_thrift.ColumnMetaData {
+export interface ColumnMetaDataExt extends parquet_thrift_t.ColumnMetaData {
     offsetIndex?: OffsetIndex;
     columnIndex?: ColumnIndex;
 }
-export interface RowGroupExt extends parquet_thrift.RowGroup {
+export interface RowGroupExt extends parquet_thrift_t.RowGroup {
     columns: ColumnChunkExt[];
 }
 export declare class KeyValue {
@@ -96,7 +97,7 @@ export interface PageData {
     pageHeader?: PageHeader;
     count?: number;
     dictionary?: unknown[];
-    column?: parquet_thrift.ColumnChunk;
+    column?: parquet_thrift_t.ColumnChunk;
     useDictionary?: boolean;
 }
 export declare class PageHeader {
@@ -134,7 +135,7 @@ export interface ClientS3 {
     headObject: (params: ClientParameters) => PromiseS3;
     getObject: (args: any) => PromiseS3;
 }
-export interface FileMetaDataExt extends parquet_thrift.FileMetaData {
+export interface FileMetaDataExt extends parquet_thrift_t.FileMetaData {
     json?: JSON;
     row_groups: RowGroupExt[];
 }
@@ -170,7 +171,7 @@ export interface WriterOptions {
 }
 export interface Page {
     page: Buffer;
-    statistics: parquet_thrift.Statistics;
+    statistics: parquet_thrift_t.Statistics;
     first_row_index: number;
     distinct_values: Set<any>;
     num_values: number;
